@@ -1,0 +1,1615 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>MARÉ Mapa Público</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Domine:wght@500;700&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: abas no topo; Mapa público = título + mapa enquadrado num cartão + resumo; Painel do gestor = página com mapa, lista e detalhe */
+:root {
+  --marinho: #0F2A3A;
+  --areia: #F6F1E7;
+  --terracota: #B4532A;
+  --laranja: #F2A65A;
+  --verde: #1F7A70;
+  --texto2: #4A5568;
+  --vidro: rgba(10, 30, 43, 0.8);
+  --vidro-borda: rgba(246, 241, 231, 0.18);
+  --suave: #B9C8CF;
+  --linha: #E3DAC6;
+  --fonte-titulo: 'Domine', Georgia, serif;
+  --fonte-texto: 'DM Sans', system-ui, sans-serif;
+  --topo-h: calc(env(safe-area-inset-top, 0px) + 78px);
+  --mar1: #1d6d86; --mar2: #124a63; --terra: #2A4A2C; --faixa: #EAD9AE;
+  --espuma: #E9F7F5; --raso: #4FB3B5; --curva: rgba(120, 100, 70, 0.28);
+  --onda: rgba(255, 255, 255, 0.5); --ceu: #9FC9D0;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--marinho); color: var(--areia); font-family: var(--fonte-texto); -webkit-font-smoothing: antialiased; }
+button, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:focus-visible, select:focus-visible, .marcador:focus-visible { outline: 3px solid var(--laranja); outline-offset: 2px; }
+
+#app { position: fixed; inset: 0; overflow: hidden; background: var(--mar2); }
+#palco { position: absolute; inset: 0; perspective: 1000px; overflow: hidden; touch-action: none; cursor: grab; background: var(--mar2); }
+#palco:active { cursor: grabbing; }
+#plano { position: absolute; left: -25%; top: -25%; width: 150%; height: 150%; transform-origin: 50% 50%; will-change: transform; }
+#mapa { width: 100%; height: 100%; display: block; user-select: none; -webkit-user-select: none; }
+#ceu { position: absolute; left: 0; right: 0; top: 0; height: 50%; pointer-events: none; opacity: 0; background: linear-gradient(to bottom, var(--ceu) 0%, transparent 100%); }
+
+/* ---- elementos do mapa ---- */
+.mar-s0 { stop-color: #2F8A98; } .mar-s1 { stop-color: #23748F; } .mar-s2 { stop-color: #1B5C82; }
+#mapa .raso { fill: none; stroke: #5CC9C2; stroke-width: 44; stroke-linejoin: round; opacity: 0.45; }
+#mapa .raso2 { fill: none; stroke: #2FA6B4; stroke-width: 130; stroke-linejoin: round; opacity: 0.35; }
+#mapa .restinga { fill: none; stroke: #6F8F4E; stroke-width: 26; stroke-linejoin: round; opacity: 0.9; }
+#mapa .estrada { fill: none; stroke: #6F6A5C; stroke-width: 5; stroke-linejoin: round; opacity: 0.85; }
+#mapa .rua { fill: none; stroke: #C8BA98; stroke-width: 1.8; opacity: 0.8; }
+#mapa .canal { fill: none; stroke: #3A9DB5; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.rotulo-local { font-family: var(--fonte-texto); font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px; fill: #F4E3A1;
+  paint-order: stroke; stroke: rgba(10, 30, 20, 0.85); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; transition: opacity 0.25s; }
+.zoom-perto .rotulo-local { opacity: 0; }
+#mapa .terra { fill: var(--terra); }
+#mapa .contorno { fill: none; stroke: var(--curva); stroke-width: 1.6; }
+#mapa .faixa { fill: none; stroke: var(--faixa); stroke-width: 20; stroke-linejoin: round; }
+#mapa .base { fill: none; stroke: #F6F1E7; stroke-width: 2; stroke-dasharray: 7 6; opacity: 0.85; }
+#mapa .costa { fill: none; stroke: var(--espuma); stroke-width: 2.4; stroke-linejoin: round; }
+#mapa .onda { fill: none; stroke: rgba(255, 255, 255, 0.28); stroke-width: 2; stroke-dasharray: 26 44; animation: corre 7s linear infinite; }
+#mapa .onda:nth-child(2) { animation-duration: 9s; animation-delay: -3s; }
+#mapa .onda:nth-child(3) { animation-duration: 11s; animation-delay: -6s; }
+#mapa .onda:nth-child(4) { animation-duration: 13s; animation-delay: -2s; }
+@keyframes corre { to { stroke-dashoffset: -140; } }
+/* porto e fluxo de areia */
+.rotulo-porto { font-family: var(--fonte-texto); font-size: 13px; font-weight: 700; fill: #fff; paint-order: stroke; stroke: rgba(10, 20, 30, 0.8); stroke-width: 3.5px; pointer-events: none; }
+.rotulo-fluxo { font-family: var(--fonte-texto); font-size: 10.5px; font-weight: 700; fill: #F4E3A1; paint-order: stroke; stroke: rgba(10, 20, 30, 0.8); stroke-width: 3px; pointer-events: none; }
+#mapa .fluxo { fill: none; stroke: #F4E3A1; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 16 10; animation: corre 6s linear infinite; }
+#mapa .fluxo.fraco { opacity: 0.45; stroke-width: 3; stroke-dasharray: 6 14; animation-duration: 14s; }
+/* calor: brilho nos trechos com erosão; pulsa devagar nos críticos */
+.calor-crit { animation: brilho 2.6s ease-in-out infinite alternate; }
+@keyframes brilho { from { opacity: 0.55; } to { opacity: 1; } }
+.mexendo #mapa .fluxo, .mexendo .calor-crit { animation-play-state: paused; }
+#mapa .oceano { fill: #fff; opacity: 0.16; font-family: var(--fonte-titulo); font-size: 46px; letter-spacing: 18px; }
+
+.marcador { cursor: pointer; transition: opacity 0.3s; }
+.marcador.apagado { opacity: 0.18; pointer-events: none; }
+.marcador .anel { fill: none; stroke: var(--terracota); stroke-width: 2.5; display: none; transform-box: fill-box; transform-origin: center; }
+.marcador.crit .anel { display: inline; animation: pulso 2.2s ease-out infinite; }
+.marcador.sel .anel { display: inline; stroke: var(--areia); animation: none; opacity: 0.9; }
+.marcador .sombra { fill: rgba(0, 0, 0, 0.35); }
+.marcador .pino { transition: transform 0.25s; transform-origin: 0 0; }
+.marcador.sel .pino { transform: scale(1.3); }
+.marcador .g-crit, .marcador .g-aten, .marcador .g-est { display: none; }
+.marcador.crit .g-crit, .marcador.aten .g-aten, .marcador.est .g-est { display: inline; }
+.rotulo { font-family: var(--fonte-texto); font-size: 12px; font-weight: 700; fill: var(--areia);
+  paint-order: stroke; stroke: rgba(6, 22, 31, 0.9); stroke-width: 3.5px; stroke-linejoin: round; opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+.zoom-perto .marcador .rotulo { opacity: 1; }
+.rotulo-praia { font-family: var(--fonte-texto); font-size: 14px; font-weight: 700; letter-spacing: 0.2px;
+  fill: #fff; paint-order: stroke; stroke: rgba(6, 22, 40, 0.55); stroke-width: 3px; opacity: 1; transition: opacity 0.25s; pointer-events: none; }
+.zoom-perto .rotulo-praia { opacity: 0; }
+@keyframes pulso { from { transform: scale(0.5); opacity: 0.9; } to { transform: scale(1.7); opacity: 0; } }
+
+/* ---- topo e abas ---- */
+#topo { position: fixed; top: 0; left: 0; right: 0; z-index: 8; background: var(--marinho); padding: env(safe-area-inset-top, 0px) 0 0; }
+#faixa { text-align: center; color: var(--suave); font-size: 11px; letter-spacing: 0.4px; line-height: 16px; padding: 5px 16px; }
+#abas { display: flex; justify-content: center; gap: 8px; height: 52px; padding: 6px max(12px, env(safe-area-inset-right, 0px)) 6px max(12px, env(safe-area-inset-left, 0px)); }
+#abas button { flex: 1; max-width: 260px; height: 40px; border-radius: 12px; border: 1px solid var(--vidro-borda); background: transparent; font-size: 14px; font-weight: 500; min-width: 0; white-space: nowrap; }
+#abas button[aria-pressed="true"] { background: var(--areia); color: var(--marinho); font-weight: 700; border-color: var(--areia); }
+
+.vidro { background: var(--vidro); border: 1px solid var(--vidro-borda); }
+/* desempenho: animações do mapa param enquanto o usuário mexe */
+.mexendo #mapa .onda, .mexendo .marcador.crit .anel { animation-play-state: paused; }
+
+/* ---- mapa público ---- */
+#publico { position: fixed; left: 0; right: 0; bottom: 0; top: var(--topo-h); overflow-y: auto; overscroll-behavior: contain;
+  background: linear-gradient(180deg, #0F2A3A 0%, #11374A 30%, #14506A 70%, #1d6d86 100%); background-attachment: local;
+  padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 24px) max(16px, env(safe-area-inset-left, 0px)); }
+.modo-gestor #publico { display: none; }
+.pub-wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.marca { display: flex; align-items: center; gap: 8px; color: #8FD3C8; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; font-weight: 700; }
+.marca b { font-family: var(--fonte-titulo); font-size: 15px; letter-spacing: 3px; color: var(--areia); }
+.hero h1 { font-family: var(--fonte-titulo); font-weight: 700; font-size: 28px; line-height: 1.18; margin: 10px 0 8px; text-wrap: balance; }
+.hero p { font-size: 14px; line-height: 1.45; color: var(--suave); max-width: 46ch; }
+
+#moldura { position: relative; height: 480px; height: clamp(360px, 62svh, 680px); border-radius: 22px; overflow: hidden;
+  border: 1px solid var(--vidro-borda); background: var(--mar2); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35); }
+#legenda { position: absolute; z-index: 3; left: 10px; bottom: 10px; max-width: calc(100% - 20px); display: flex; flex-wrap: wrap; gap: 4px 10px;
+  padding: 6px 10px; border-radius: 12px; background: rgba(246, 241, 231, 0.94); color: var(--marinho); font-size: 11.5px; font-weight: 500; pointer-events: none; }
+#legenda span { display: inline-flex; align-items: center; gap: 4px; }
+
+#bussola { position: absolute; z-index: 3; top: 10px; left: 10px; width: 44px; height: 50px; border-radius: 14px; border: 0;
+  background: rgba(246, 241, 231, 0.94); color: var(--marinho); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0; }
+#selo-mapa { position: absolute; z-index: 3; top: 12px; right: 14px; text-align: right; pointer-events: none; text-shadow: 0 2px 10px rgba(0, 20, 40, 0.6); }
+#selo-mapa b { display: block; font-family: var(--fonte-titulo); font-size: 22px; line-height: 1.02; color: #fff; letter-spacing: 0.5px; }
+#selo-mapa span { display: block; margin-top: 4px; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: #F4E3A1; }
+#selo-mapa small { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #8FD3C8; text-transform: uppercase; }
+#bussola small { font-size: 10px; font-weight: 700; line-height: 1; }
+
+#dica { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); bottom: 52px;
+  padding: 7px 12px; border-radius: 16px; font-size: 12px; font-weight: 500; white-space: nowrap; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; transition: opacity 0.6s; pointer-events: none; }
+#dica.some { opacity: 0; }
+
+#doca { border-radius: 20px; padding: 14px 16px 12px; }
+.doca-info { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.doca-info div { min-width: 0; }
+.doca-info b { display: block; font-family: var(--fonte-titulo); font-size: 24px; font-variant-numeric: tabular-nums; }
+.doca-info span { display: block; font-size: 12px; line-height: 1.3; color: var(--suave); }
+.rodape { margin-top: 8px; font-size: 10.5px; color: var(--suave); }
+
+.modo-gestor #folha { display: none; }
+.com-folha #dica { display: none; }
+
+/* ---- folha inferior ---- */
+#folha { position: fixed; z-index: 6; left: 0; right: 0; bottom: 0; max-height: 60%; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--areia); color: var(--marinho); border-radius: 24px 24px 0 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 20px) max(16px, env(safe-area-inset-left, 0px));
+  transform: translateY(104%); visibility: hidden; transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s 0.45s; }
+#folha.aberta { transform: none; visibility: visible; transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.alca { width: 40px; height: 4px; border-radius: 2px; background: #cfc6b3; margin: 0 auto 10px; }
+.fechar { position: absolute; top: 12px; right: max(14px, env(safe-area-inset-right, 0px)); width: 36px; height: 36px; border-radius: 18px; border: 0; background: #E7DFCF; color: var(--marinho); display: grid; place-items: center; }
+.praia { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--texto2); }
+#folha h2 { font-family: var(--fonte-titulo); font-size: 24px; line-height: 1.2; margin: 2px 40px 8px 0; }
+.linha-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 12px; }
+.selo { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; border-radius: 14px; font-size: 13px; font-weight: 700; }
+.selo.crit { background: #F1D5C7; color: #8A3A18; } .selo.aten { background: #FBE3C3; color: #7A4A0E; } .selo.est { background: #CDE8E3; color: #14574F; }
+.mini { font-size: 12.5px; color: var(--texto2); }
+.cena { border-radius: 14px; overflow: hidden; border: 1px solid #dcd2bd; }
+.cena svg { display: block; width: 100%; height: auto; max-height: 150px; }
+.nota { font-size: 11.5px; color: var(--texto2); margin: 6px 0 14px; }
+.relato { background: #fff; border: 1px solid var(--linha); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px; }
+.tag { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--texto2); }
+.texto-relato { font-family: var(--fonte-titulo); font-size: 17px; line-height: 1.4; margin: 6px 0 10px; text-wrap: pretty; }
+.chips-info { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips-info span { font-size: 12.5px; font-weight: 500; padding: 4px 10px; border-radius: 12px; background: #EFE8D8; font-variant-numeric: tabular-nums; }
+.chips-info .Alta { background: #CDE8E3; color: #14574F; font-weight: 700; } .chips-info .Média { background: #FBE3C3; color: #7A4A0E; font-weight: 700; } .chips-info .Baixa { background: #F1D5C7; color: #8A3A18; font-weight: 700; }
+.selo-conf { font-size: 12.5px; color: var(--texto2); margin-top: 8px; line-height: 1.4; }
+#folha h3 { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--texto2); margin: 4px 0 8px; }
+.grafico { background: #fff; border: 1px solid var(--linha); border-radius: 16px; padding: 8px 10px; margin-bottom: 14px; }
+.grafico svg { display: block; width: 100%; height: auto; }
+.linha-tempo { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.cartao-tempo { flex: 0 0 132px; scroll-snap-align: start; background: #fff; border: 1px solid var(--linha); border-radius: 14px; overflow: hidden; color: var(--marinho); }
+.cartao-tempo.ultimo { border: 2px solid var(--marinho); }
+.cartao-tempo svg { display: block; width: 100%; height: auto; }
+.cartao-tempo div { padding: 6px 8px 8px; }
+.cartao-tempo b { display: block; font-size: 13px; font-variant-numeric: tabular-nums; }
+.cartao-tempo small { display: block; font-size: 11.5px; line-height: 1.3; color: var(--texto2); margin-top: 2px; }
+.privacidade { font-size: 11.5px; color: var(--texto2); margin-top: 10px; }
+
+/* ---- painel do gestor ---- */
+#gestor { display: none; position: fixed; left: 0; right: 0; bottom: 0; top: var(--topo-h); overflow-y: auto; background: var(--areia); color: var(--marinho);
+  padding: 20px max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 40px) max(16px, env(safe-area-inset-left, 0px)); }
+.modo-gestor #gestor { display: block; }
+.g-cab h1 { font-family: var(--fonte-titulo); font-size: 26px; line-height: 1.2; text-wrap: balance; }
+.g-cab p { color: var(--texto2); font-size: 14px; margin-top: 4px; }
+.g-wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.kpi { background: #fff; border: 1px solid var(--linha); border-radius: 16px; padding: 14px 14px 12px; min-width: 0; }
+.kpi span { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--texto2); }
+.kpi b { display: block; font-family: var(--fonte-titulo); font-size: 34px; line-height: 1.15; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+.kpi small { color: var(--texto2); font-size: 12px; }
+.g-grade { display: grid; grid-template-columns: 1fr; gap: 16px; }
+#mapaGestor { position: relative; height: 380px; border-radius: 18px; overflow: hidden; background: var(--mar2); border: 1px solid var(--linha); }
+.g-lista { background: #fff; border: 1px solid var(--linha); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.filtros { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.filtros label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--texto2); min-width: 0; }
+.filtros label:last-child { grid-column: 1 / -1; }
+.filtros select { height: 44px; border-radius: 12px; border: 1px solid #cfc6b3; background: var(--areia); padding: 0 10px; font-size: 14px; color: var(--marinho); text-transform: none; letter-spacing: 0; font-weight: 500; min-width: 0; }
+#lista { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+#lista button { width: 100%; display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 14px; border: 2px solid var(--linha); background: #fff; color: var(--marinho); }
+#lista button[aria-current="true"] { border-color: var(--marinho); background: #FBF8F1; }
+#lista strong { display: block; font-size: 14.5px; }
+#lista small { display: block; font-size: 12px; color: var(--texto2); line-height: 1.35; }
+#lista .dir { text-align: right; font-variant-numeric: tabular-nums; }
+.vazio { font-size: 14px; color: var(--texto2); padding: 12px 4px; }
+.g-detalhe { background: #fff; border: 1px solid var(--linha); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.det-topo { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.det-topo h2 { font-family: var(--fonte-titulo); font-size: 24px; line-height: 1.2; margin: 2px 0 8px; }
+.btn-rel { height: 46px; padding: 0 18px; border-radius: 23px; border: 0; background: var(--verde); color: #fff; font-weight: 700; font-size: 14.5px; }
+.g-duas { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.g-caixa { border: 1px solid var(--linha); border-radius: 16px; padding: 12px 14px; min-width: 0; background: #FDFBF6; }
+.g-caixa h3, .g-retorno h2, .papel h3 { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--texto2); margin-bottom: 8px; }
+.g-caixa svg { display: block; width: 100%; height: auto; }
+.galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.galeria figure { margin: 0; border: 1px solid var(--linha); border-radius: 12px; overflow: hidden; background: #fff; }
+.galeria svg { display: block; width: 100%; height: auto; }
+.galeria figcaption { font-size: 11.5px; padding: 5px 8px 7px; color: var(--texto2); font-variant-numeric: tabular-nums; line-height: 1.3; }
+.tabela { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 700px; font-size: 13.5px; }
+th { text-align: left; font-size: 11.5px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--texto2); padding: 8px 10px; border-bottom: 2px solid var(--linha); white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--linha); vertical-align: top; font-variant-numeric: tabular-nums; }
+td.rel { min-width: 240px; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.pill.Alta, .pill.Leve { background: #CDE8E3; color: #14574F; } .pill.Média, .pill.Moderada { background: #FBE3C3; color: #7A4A0E; } .pill.Baixa, .pill.Grave { background: #F1D5C7; color: #8A3A18; }
+.g-retorno { background: #fff; border: 1px solid var(--linha); border-radius: 18px; padding: 16px; }
+.g-retorno ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.g-retorno li { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 12px; background: var(--areia); font-size: 14px; line-height: 1.4; }
+.g-retorno li small { display: block; color: var(--texto2); font-size: 12px; }
+.g-retorno p.nota { margin: 10px 0 0; }
+.g-retorno .ret-cab { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.g-retorno .ret-cab h2 { font-family: var(--fonte-titulo); font-size: 22px; letter-spacing: 0; text-transform: none; color: var(--marinho); margin: 0; line-height: 1.2; }
+.g-retorno .ret-cab p { font-size: 13px; color: var(--texto2); }
+.g-retorno li b { display: block; font-size: 14px; }
+
+#modal { position: fixed; inset: 0; z-index: 20; background: rgba(6, 22, 31, 0.72); display: flex; align-items: center; justify-content: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px) max(12px, env(safe-area-inset-left, 0px)); }
+.papel { position: relative; background: #FFFDF8; color: var(--marinho); border-radius: 18px; width: 100%; max-width: 760px; max-height: 100%; overflow-y: auto; padding: 22px 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.papel h2 { font-family: var(--fonte-titulo); font-size: 23px; line-height: 1.2; margin-right: 44px; }
+.papel .selo-previa { align-self: flex-start; font-size: 11.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; padding: 4px 10px; border-radius: 10px; background: #FBE3C3; color: #7A4A0E; }
+.papel p { font-size: 14.5px; line-height: 1.55; max-width: 62ch; }
+.papel ul { padding-left: 18px; font-size: 14.5px; line-height: 1.5; display: flex; flex-direction: column; gap: 4px; }
+.papel .fontes { font-size: 12.5px; color: var(--texto2); border-top: 1px solid var(--linha); padding-top: 10px; }
+.papel table { min-width: 460px; }
+.papel .fechar { top: 14px; right: 14px; }
+
+@media (min-width: 700px) { .kpis { grid-template-columns: repeat(4, 1fr); } .g-duas { grid-template-columns: 1fr 1.2fr; } .filtros { grid-template-columns: 1fr 1fr 1fr; } .filtros label:last-child { grid-column: auto; } }
+@media (min-width: 1000px) {
+  .g-grade { grid-template-columns: 1.55fr 1fr; align-items: stretch; }
+  #mapaGestor { height: 600px; }
+  .g-lista { max-height: 600px; }
+  .g-lista .filtros { grid-template-columns: 1fr 1fr; } .g-lista .filtros label:last-child { grid-column: 1 / -1; }
+}
+@media (min-width: 900px) {
+  .hero h1 { font-size: 34px; }
+  #moldura { height: clamp(420px, 66vh, 720px); }
+  #folha { left: max(16px, env(safe-area-inset-left, 0px)); right: auto; bottom: 16px; width: 440px; max-height: calc(100% - 100px); border-radius: 24px; }
+}
+@media (max-width: 380px) { #abas button { font-size: 13px; } }
+@media (prefers-reduced-motion: reduce) {
+  #mapa .onda, .marcador.crit .anel, #mapa .fluxo, .calor-crit { animation: none; }
+  #folha, #folha.aberta, #dica { transition: none; }
+}
+</style>
+
+<div id="app">
+  <header id="topo">
+    <div id="faixa">Protótipo · dados de exemplo para demonstração</div>
+    <nav id="abas" aria-label="Áreas da plataforma">
+      <button type="button" id="abaPublico" aria-pressed="true">Mapa público</button>
+      <button type="button" id="abaGestor" aria-pressed="false">Painel do gestor (SEMA)</button>
+    </nav>
+  </header>
+
+  <main id="publico">
+    <div class="pub-wrap">
+      <section class="hero">
+        <div class="marca">
+      <svg width="30" height="20" viewBox="0 0 30 20" aria-hidden="true"><path d="M1 10 Q15 -3 29 10 Q15 23 1 10Z" fill="none" stroke="#F6F1E7" stroke-width="1.6"/><circle cx="15" cy="10" r="4.6" fill="#1F7A70"/><circle cx="15" cy="10" r="1.8" fill="#F2A65A"/></svg>
+      <b>MARÉ</b><span>· Monitoramento comunitário</span>
+    </div>
+        <h1>Onde o mar está avançando em Ilhéus</h1>
+        <p>Relatos da comunidade revelam como a costa muda a cada maré grande. Zona norte de Ilhéus.</p>
+      </section>
+      <div id="moldura">
+        <div id="palco">
+        <div id="plano">
+          <svg id="mapa" role="application" aria-label="Mapa interativo da erosão costeira na zona norte de Ilhéus">
+            <defs>
+              <linearGradient id="gMar" gradientUnits="userSpaceOnUse" x1="180" y1="0" x2="1300" y2="0">
+                <stop offset="0" class="mar-s0"/><stop offset="0.25" class="mar-s1"/><stop offset="1" class="mar-s2"/>
+              </linearGradient>
+              <radialGradient id="calorCrit"><stop offset="0" stop-color="#FF6A3D" stop-opacity="0.8"/><stop offset="0.45" stop-color="#B4532A" stop-opacity="0.4"/><stop offset="1" stop-color="#B4532A" stop-opacity="0"/></radialGradient>
+              <radialGradient id="calorAten"><stop offset="0" stop-color="#F2A65A" stop-opacity="0.7"/><stop offset="1" stop-color="#F2A65A" stop-opacity="0"/></radialGradient>
+              <marker id="seta" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#F4E3A1"/></marker>
+            </defs>
+            <g id="mundo">
+              <rect x="-6000" y="-5000" width="12000" height="12000" fill="url(#gMar)"/>
+              <path id="terra" class="terra"/>
+              <image id="superficie" preserveAspectRatio="none"/>
+              <g id="cidade"></g>
+              <g id="ondas">
+                <path class="onda" transform="translate(36 0)"/><path class="onda" transform="translate(80 0)"/>
+                <path class="onda" transform="translate(130 0)"/><path class="onda" transform="translate(190 0)"/>
+              </g>
+              <path id="erosao" fill="#C9683A" fill-opacity="0.7"/>
+              <path id="base" class="base"/>
+              <path id="costa" class="costa"/>
+              <g id="porto"></g>
+              <g id="calor"></g>
+              <text class="oceano" x="560" y="900" transform="rotate(-80 560 900)">OCEANO ATLÂNTICO</text>
+              <g id="locais"></g>
+              <g id="praias"></g>
+              <g id="marcadores"></g>
+            </g>
+          </svg>
+        </div>
+        <div id="ceu"></div>
+      </div>
+
+        <button id="bussola" type="button" aria-label="Voltar o mapa para o norte">
+          <small>N</small>
+          <svg id="agulha" width="24" height="24" viewBox="-13 -13 26 26" aria-hidden="true"><path d="M0 -10 L5 3 L0 0 L-5 3Z" fill="#0F2A3A"/><path d="M0 10 L5 3 L0 0 L-5 3Z" fill="#B4532A"/></svg>
+        </button>
+        <div id="selo-mapa" aria-hidden="true"><b>COSTA NORTE</b><b>ILHÉUS</b><span>PRAIAS</span><small>8 pontos monitorados</small></div>
+        <p id="dica" class="vidro"></p>
+        <div id="legenda"></div>
+      </div>
+      <section id="doca" class="vidro" aria-label="Resumo">
+        <div class="doca-info">
+          <div><b>26/10</b><span>Próxima maré grande · data de exemplo</span></div>
+          <div><b id="nRelatos">9</b><span>relatos da comunidade chegaram no último mês</span></div>
+        </div>
+        <p class="rodape"><b>Porto do Ilheus:</b> o molhe retém parte da areia levada pelas ondas ao longo da costa; ao norte dele falta areia e a erosão aparece em trechos isolados. Esquema ilustrativo.</p>
+        <p class="rodape">Recuo da costa ampliado no mapa para facilitar a leitura.</p>
+      </section>
+    </div>
+  </main>
+
+  <section id="folha" aria-hidden="true" aria-label="Detalhe do ponto"></section>
+
+  <main id="gestor">
+    <div class="g-wrap">
+      <div class="g-cab"><h1>Painel do gestor (SEMA)</h1><p>Piloto na zona norte de Ilhéus. Todos os números são exemplos para demonstração.</p></div>
+      <div id="kpis" class="kpis"></div>
+      <div class="g-grade">
+        <section aria-label="Mapa dos pontos"><div id="mapaGestor"></div></section>
+        <section class="g-lista" aria-label="Lista de pontos">
+          <div class="filtros">
+            <label for="selStatus">Status<select id="selStatus"></select></label>
+            <label for="selPraia">Praia<select id="selPraia"></select></label>
+            <label for="selPeriodo">Período<select id="selPeriodo"></select></label>
+          </div>
+          <ol id="lista"></ol>
+        </section>
+      </div>
+      <section id="detalhe" class="g-detalhe" aria-live="polite"></section>
+      <section class="g-retorno" aria-label="Retorno para a comunidade">
+        <div class="ret-cab">
+          <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="#CDE8E3"/><path d="M20 10 C15.5 10 13 13.2 13 17 L13 21 L11 25 L29 25 L27 21 L27 17 C27 13.2 24.5 10 20 10Z" fill="none" stroke="#14574F" stroke-width="1.8" stroke-linejoin="round"/><path d="M17.5 28 Q20 30.5 22.5 28" fill="none" stroke="#14574F" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div><h2>Retorno para a comunidade</h2><p>Avisos enviados para quem acompanha cada trecho.</p></div>
+        </div>
+        <ul id="retorno"></ul>
+        <p class="nota">Avisos de exemplo, enviados de volta a quem faz relatos, por trecho.</p>
+      </section>
+    </div>
+  </main>
+
+  <div id="modal" hidden><div class="papel" id="papel" role="dialog" aria-modal="true" aria-label="Prévia do relatório"></div></div>
+</div>
+
+<script>
+// ============================ DADOS DE EXEMPLO ============================
+var MARES = ['15/06/2026', '14/07/2026', '12/08/2026', '11/09/2026', '10/10/2026'];
+var ULT = 4;   // índice da última maré grande
+var NOMES = { crit: 'Crítico', aten: 'Atenção', est: 'Estável' };
+var GRAV = ['Leve', 'Moderada', 'Grave'];
+
+// recuo = metros de recuo acumulado da costa em cada maré grande (valores de exemplo)
+var PONTOS = [
+  { id: 1, nome: 'Rampa do rancho', praia: 'São Miguel', lat: -14.762, lon: -39.059, recuo: [0, 4, 9, 16, 26],
+    extra: [
+      { t: 0, texto: 'Areia firme na rampa, nada fora do normal.', sev: 0 },
+      { t: 1, texto: 'Já aparece um pequeno degrau de areia perto da rampa.', sev: 1 },
+      { t: 2, texto: 'O degrau de areia chegou na rampa do rancho.', sev: 2 },
+      { t: 3, texto: 'A maré passou por baixo da rampa e levou parte do aterro.', sev: 2 },
+      { t: 3, texto: 'Pescadores precisaram puxar os barcos mais para dentro.', sev: 2 },
+      { t: 4, texto: 'A água bateu no rancho. A rampa já não dá para usar.', sev: 2 },
+      { t: 4, texto: 'Três canoas foram tiradas da beira antes da maré subir.', sev: 2 },
+      { t: 4, texto: 'A cerca do rancho caiu na maré da noite.', sev: 2 }] },
+  { id: 2, nome: 'Barracas da praia', praia: 'São Miguel', lat: -14.742, lon: -39.055, recuo: [0, 1, 1, 2, 3],
+    textos: ['Barracas no lugar de sempre, praia larga.', 'Praia igual, só um pouco de areia levada na ponta.', 'Sem mudança nas barracas.', 'Areia um pouco mais baixa, nada preocupante.', 'Barracas firmes, praia estável.'] },
+  { id: 3, nome: 'Casas da frente de praia', praia: 'São Domingos', lat: -14.720, lon: -39.050, recuo: [0, 2, 6, 12, 17],
+    textos: ['Calçada da frente intacta.', 'Pequena erosão no canto do muro.', 'O muro da primeira casa ficou com a base exposta.', 'A água entrou até o muro na maré grande.', 'Parte do muro caiu. Moradores puseram sacos de areia.'] },
+  { id: 4, nome: 'Coqueiral', praia: 'São Domingos', lat: -14.705, lon: -39.046, recuo: [0, 0, 1, 1, 2],
+    textos: ['Coqueiral firme, sem mudança.', 'Tudo normal.', 'Raízes cobertas de areia, sem dano.', 'Sem mudança relevante.', 'Coqueiral estável.'] },
+  { id: 5, nome: 'Ponta da Tulha', praia: 'Ponta da Tulha', lat: -14.686, lon: -39.041, recuo: [0, 1, 3, 6, 9],
+    textos: ['Ponta estável, pedras cobertas de areia.', 'A areia baixou e as pedras apareceram mais.', 'Pequeno barranco formado na ponta.', 'O barranco avançou alguns passos para dentro.', 'A trilha de acesso à ponta ficou cortada pelo barranco.'] },
+  { id: 6, nome: 'Mamoã', praia: 'Mamoã', lat: -14.672, lon: -39.038, recuo: [0, 0, 1, 1, 1],
+    textos: ['Praia larga e firme.', 'Sem mudança.', 'Margem do canal normal.', 'Tudo normal.', 'Praia estável, sem danos.'] },
+  { id: 7, nome: 'Joia do Atlântico', praia: 'Joia do Atlântico', lat: -14.652, lon: -39.034, recuo: [0, 2, 5, 9, 13],
+    textos: ['Tudo normal na frente do quiosque.', 'A maré grande chegou mais perto do quiosque.', 'Degrau de areia de meio metro na frente da praia.', 'A água chegou na cerca do quiosque.', 'Parte do deque do quiosque caiu na maré grande.'] },
+  { id: 8, nome: 'Ponta do Ramo', praia: 'Ponta do Ramo', lat: -14.640, lon: -39.032, recuo: [0, 1, 2, 4, 7],
+    textos: ['Tudo normal.', 'Pouca areia levada.', 'Pequeno barranco perto da trilha.', 'O barranco cresceu alguns passos.', 'O barranco cresceu de novo.'] }
+];
+
+var AVISOS = [
+  { quando: '08/10/2026', texto: 'Lembrete da maré grande enviado para 23 pessoas em São Miguel' },
+  { quando: '08/10/2026', texto: 'Lembrete da maré grande enviado para 17 pessoas em São Domingos' },
+  { quando: '06/10/2026', texto: 'Pedido de nova foto da rampa enviado para 6 pessoas em São Miguel' },
+  { quando: '29/09/2026', texto: 'Aviso de ondas altas no fim de semana enviado para 31 pessoas na zona norte' },
+  { quando: '14/09/2026', texto: 'Agradecimento pelos relatos de setembro enviado para 12 pessoas em Mamoã e Ponta da Tulha' },
+  { quando: 'Agendado para 07/11/2026', texto: 'Pedido de novo registro no ponto 8 (Ponta do Ramo), sem relato na última maré, para 12 pessoas', agendado: true }
+];
+
+function statusDe(metros) {
+  if (metros >= 12) return 'crit';
+  if (metros >= 6) return 'aten';
+  return 'est';
+}
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function dataMais(str, dias) {
+  var p = str.split('/');
+  var d = new Date(Date.UTC(+p[2], +p[1] - 1, +p[0] + dias));
+  return pad(d.getUTCDate()) + '/' + pad(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear();
+}
+function virgula(n) { return n.toFixed(1).replace('.', ','); }
+
+// Monta os relatos de cada ponto. A nota de confiança vem de regras simples.
+function montaRelatos() {
+  for (var i = 0; i < PONTOS.length; i++) {
+    var p = PONTOS[i];
+    var base = [];
+    if (p.extra) {
+      base = p.extra;
+    } else {
+      for (var t = 0; t <= ULT; t++) {
+        if (p.id === 8 && t === ULT) continue;   // ponto sem relato na última maré (cobertura 7 de 8)
+        base.push({ t: t, texto: p.textos[t], sev: p.recuo[t] >= 12 ? 2 : (p.recuo[t] >= 5 ? 1 : 0) });
+      }
+    }
+    var contagem = {};
+    p.relatos = [];
+    for (var j = 0; j < base.length; j++) {
+      var r = base[j];
+      var k = contagem[r.t] || 0;
+      contagem[r.t] = k + 1;
+      var conf = (p.id * 3 + r.t * 2 + k) % 4;                  // vizinhos que confirmaram (0 a 3)
+      var conferida = ((p.id + r.t + k) % 7) !== 0;             // maré e onda conferidas
+      var pts = 1 + (conferida ? 1 : 0) + (conf >= 2 ? 1 : 0);  // 1 ponto pela localização na hora
+      p.relatos.push({
+        t: r.t, texto: r.texto, sev: r.sev, data: dataMais(MARES[r.t], k), conf: conf, conferida: conferida,
+        onda: 1.1 + ((p.id * 7 + r.t * 3 + k) % 9) / 10, mare: 2.0 + ((p.id * 5 + r.t * 2 + k) % 6) / 10,
+        nivel: pts === 3 ? 'Alta' : (pts === 2 ? 'Média' : 'Baixa')
+      });
+    }
+  }
+}
+montaRelatos();
+
+// ============================ GEOMETRIA DA COSTA ============================
+var ESCALA = 7000;          // pixels do mapa por grau de latitude
+var PX_METRO = 1.3;         // pixels do mapa por metro de recuo (ampliado)
+var OFFSET_MARCADOR = 30;   // o ponto fica um pouco para dentro da terra
+var INCLINACAO = 55;        // graus de inclinação máxima
+
+function mundo(lat, lon) { return { x: (lon + 39.065) * 6770, y: (-14.60 - lat) * ESCALA }; }
+
+var controles = [], amostras = [], indiceControle = [];
+
+function normaliza(dx, dy) {
+  var n = Math.sqrt(dx * dx + dy * dy) || 1;
+  return { x: dx / n, y: dy / n };
+}
+
+function montaControles() {
+  // ordem geográfica: do ponto mais ao norte para o mais ao sul
+  var ordem = [];
+  for (var o = 0; o < PONTOS.length; o++) ordem.push(o);
+  ordem.sort(function (a, b) { return PONTOS[b].lat - PONTOS[a].lat; });
+  var base = [];
+  for (var i = 0; i < ordem.length; i++) base.push(mundo(PONTOS[ordem[i]].lat, PONTOS[ordem[i]].lon));
+  var ult = base.length - 1;
+  var dN = normaliza(base[1].x - base[0].x, base[1].y - base[0].y);
+  var dS = normaliza(base[ult].x - base[ult - 1].x, base[ult].y - base[ult - 1].y);
+  controles.push({ x: base[0].x - dN.x * 90, y: base[0].y - dN.y * 90, ponto: -1 });
+  for (var j = 0; j <= ult; j++) {
+    controles.push({ x: base[j].x, y: base[j].y, ponto: ordem[j] });
+    if (j < ult) {
+      var d = normaliza(base[j + 1].x - base[j].x, base[j + 1].y - base[j].y);
+      var desvio = (j % 2 === 0) ? 12 : -12;
+      controles.push({ x: (base[j].x + base[j + 1].x) / 2 - d.y * desvio, y: (base[j].y + base[j + 1].y) / 2 + d.x * desvio, ponto: -1 });
+    }
+  }
+  controles.push({ x: base[ult].x + dS.x * 90, y: base[ult].y + dS.y * 90, ponto: -1 });
+}
+
+function catmull(p0, p1, p2, p3, u) {
+  var u2 = u * u, u3 = u2 * u;
+  return {
+    x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * u + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * u2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * u3),
+    y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * u + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * u2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * u3)
+  };
+}
+
+function montaAmostras() {
+  var N = 10, n = controles.length;
+  for (var j = 0; j < n - 1; j++) {
+    var p0 = controles[Math.max(0, j - 1)], p1 = controles[j], p2 = controles[j + 1], p3 = controles[Math.min(n - 1, j + 2)];
+    indiceControle[j] = amostras.length;
+    for (var s = 0; s < N; s++) {
+      var pt = catmull(p0, p1, p2, p3, s / N);
+      amostras.push({ x: pt.x, y: pt.y, j: j, u: s / N });
+    }
+  }
+  indiceControle[n - 1] = amostras.length;
+  amostras.push({ x: controles[n - 1].x, y: controles[n - 1].y, j: n - 1, u: 0 });
+  var andado = 0;
+  for (var i = 0; i < amostras.length; i++) {
+    if (i > 0) andado += Math.hypot(amostras[i].x - amostras[i - 1].x, amostras[i].y - amostras[i - 1].y);
+    amostras[i].s = andado;
+    var a = amostras[Math.max(0, i - 1)], b = amostras[Math.min(amostras.length - 1, i + 1)];
+    var t = normaliza(b.x - a.x, b.y - a.y);
+    amostras[i].nx = -t.y;   // normal apontando para a terra (oeste)
+    amostras[i].ny = t.x;
+  }
+}
+
+function suave(u) { return u * u * (3 - 2 * u); }
+function linhaDe(pts) {
+  var s = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+  for (var i = 1; i < pts.length; i++) s += 'L' + pts[i][0].toFixed(1) + ' ' + pts[i][1].toFixed(1);
+  return s;
+}
+
+// ============================ ESTADO ============================
+var modo = 'publico';
+var selecionado = null;      // ponto aberto na folha (mapa público)
+var selG = null;             // ponto escolhido no painel do gestor
+var filtro = { status: 'todos', praia: 'todas', periodo: 'todo' };
+var FOCO = { cx: 150, cy: 700, k: 0.5 };   // recalculado em focoPublico() pelo tamanho do cartão
+var view = { cx: FOCO.cx, cy: FOCO.cy, k: FOCO.k, tilt: 0.45, rumo: 0 };
+var reduzMovimento = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+var $ = function (id) { return document.getElementById(id); };
+var app = $('app'), palco = $('palco'), plano = $('plano'), mapa = $('mapa'), mundoG = $('mundo'), folha = $('folha');
+var marcadores = [], rotulosPraia = [];
+var largura = 800, altura = 800;
+
+function el(nome, attrs) {
+  var e = document.createElementNS('http://www.w3.org/2000/svg', nome);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function statusAtual(p) { return statusDe(p.recuo[ULT]); }
+function tiltPadrao() { return modo === 'publico' ? 0.45 : 0; }
+
+// ============================ ÍCONES ============================
+function glifo(st, tam) {
+  var t = tam || 16;
+  if (st === 'crit') return '<svg width="' + t + '" height="' + t + '" viewBox="-10 -10 20 20" aria-hidden="true"><circle r="9" fill="#B4532A"/><rect x="-1.4" y="-5.5" width="2.8" height="7" rx="1" fill="#fff"/><circle cy="4.2" r="1.6" fill="#fff"/></svg>';
+  if (st === 'aten') return '<svg width="' + t + '" height="' + t + '" viewBox="-10 -10 20 20" aria-hidden="true"><rect x="-6.5" y="-6.5" width="13" height="13" rx="2" transform="rotate(45)" fill="#F2A65A"/><rect x="-1.2" y="-4.5" width="2.4" height="5.5" rx="1" fill="#0F2A3A"/><circle cy="3.6" r="1.4" fill="#0F2A3A"/></svg>';
+  return '<svg width="' + t + '" height="' + t + '" viewBox="-10 -10 20 20" aria-hidden="true"><circle r="9" fill="#1F7A70"/><path d="M-4.5 0 L-1.5 3 L4.5 -3.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+var ICONE_X = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3 L13 13 M13 3 L3 13" stroke="#0F2A3A" stroke-width="2" stroke-linecap="round"/></svg>';
+var ICONE_ENVIADO = '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="11" fill="#CDE8E3"/><path d="M6.5 11.3 L9.7 14.5 L15.5 8" stroke="#14574F" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var ICONE_AGENDADO = '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="11" fill="#FBE3C3"/><circle cx="11" cy="11" r="4" fill="#F2A65A"/></svg>';
+
+// ============================ MONTAGEM DO MAPA ============================
+// gota do pino: ponta em (0,0), cabeça redonda em (0,-27)
+var GOTA = '<path d="M0 0 C-3 -7 -13 -14 -13 -27 A13 13 0 1 1 13 -27 C13 -14 3 -7 0 0Z" stroke="#fff" stroke-width="2"';
+
+function montaMarcadores() {
+  var grupos = {};
+  for (var i = 0; i < PONTOS.length; i++) {
+    var p = PONTOS[i];
+    var ic = 0;
+    for (var c = 0; c < controles.length; c++) if (controles[c].ponto === i) ic = c;
+    var s = amostras[indiceControle[ic]];
+    p.iAmostra = indiceControle[ic];
+    p.sCosta = s.s;   // posição do ponto ao longo da costa
+    p.mx = s.x + s.nx * OFFSET_MARCADOR;
+    p.my = s.y + s.ny * OFFSET_MARCADOR;
+
+    var g = el('g', { 'class': 'marcador est', tabindex: '0', role: 'button', 'data-id': p.id, 'aria-label': p.nome + ', ' + p.praia + ', ' + NOMES[statusAtual(p)] });
+    g.innerHTML =
+      '<ellipse class="anel" rx="20" ry="8"/><ellipse class="sombra" rx="6" ry="2.4"/>' +
+      '<g class="pino">' +
+      '<g class="g-crit">' + GOTA + ' fill="#B4532A"/><circle cy="-27" r="8" fill="#F6F1E7"/><rect x="-1.4" y="-32.5" width="2.8" height="6.5" rx="1" fill="#B4532A"/><circle cy="-23.5" r="1.6" fill="#B4532A"/></g>' +
+      '<g class="g-aten">' + GOTA + ' fill="#F2A65A"/><rect x="-6" y="-33" width="12" height="12" rx="2" transform="rotate(45 0 -27)" fill="#F6F1E7"/><rect x="-1.3" y="-31.5" width="2.6" height="5.5" rx="1" fill="#0F2A3A"/><circle cy="-23.8" r="1.4" fill="#0F2A3A"/></g>' +
+      '<g class="g-est">' + GOTA + ' fill="#1F7A70"/><circle cy="-27" r="8" fill="#F6F1E7"/><path d="M-4 -27 L-1.2 -24.2 L4.2 -29.8" stroke="#1F7A70" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>' +
+      '</g>' +
+      '<text class="rotulo" x="-18" y="-24" text-anchor="end">' + p.nome + '</text>';
+    g.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); aoEscolherPonto(+this.getAttribute('data-id')); }
+    });
+    $('marcadores').appendChild(g);
+    marcadores.push({ g: g, ponto: p });
+
+    if (!grupos[p.praia]) grupos[p.praia] = [];
+    grupos[p.praia].push(p);
+  }
+  for (var nome in grupos) {
+    var lista = grupos[nome], sx = 0, sy = 0;
+    for (var m = 0; m < lista.length; m++) { sx += lista[m].mx; sy += lista[m].my; }
+    var gp = el('g', {});
+    var t = el('text', { 'class': 'rotulo-praia', x: 26, y: -6, 'text-anchor': 'start' });
+    t.textContent = nome;
+    gp.appendChild(t);
+    $('praias').appendChild(gp);
+    rotulosPraia.push({ g: gp, x: sx / lista.length, y: sy / lista.length });
+  }
+}
+
+// A erosão não é contínua: cada ponto recua a costa só no seu trecho (curva em sino),
+// e entre dois pontos a costa volta ao normal. Assim um trecho crítico pode ter vizinho estável.
+var ALCANCE = 34;   // meia largura do trecho afetado, em px do mapa
+function recuoEm(s, t) {
+  var r = 0;
+  for (var p = 0; p < PONTOS.length; p++) {
+    var d = (s - PONTOS[p].sCosta) / ALCANCE;
+    r = Math.max(r, PONTOS[p].recuo[t] * Math.exp(-d * d));
+  }
+  return r;
+}
+
+function atualizaCosta() {
+  var atual = [], base = [];
+  for (var i = 0; i < amostras.length; i++) {
+    var s = amostras[i];
+    var r = recuoEm(s.s, ULT);
+    atual.push([s.x + s.nx * r * PX_METRO, s.y + s.ny * r * PX_METRO]);
+    base.push([s.x, s.y]);
+  }
+  // prolonga a costa para longe nas duas pontas
+  var a0 = amostras[0], a1 = amostras[1], z0 = amostras[amostras.length - 1], z1 = amostras[amostras.length - 2];
+  var dn = normaliza(a0.x - a1.x, a0.y - a1.y), ds = normaliza(z0.x - z1.x, z0.y - z1.y);
+  atual.unshift([atual[0][0] + dn.x * 2000, atual[0][1] + dn.y * 2000]);
+  base.unshift([a0.x + dn.x * 2000, a0.y + dn.y * 2000]);
+  atual.push([atual[atual.length - 1][0] + ds.x * 2000, atual[atual.length - 1][1] + ds.y * 2000]);
+  base.push([z0.x + ds.x * 2000, z0.y + ds.y * 2000]);
+
+  var dAtual = linhaDe(atual), dBase = linhaDe(base);
+  costaAtual = atual;
+  $('costa').setAttribute('d', dAtual);
+  $('base').setAttribute('d', dBase);
+  var ondas = document.querySelectorAll('.onda');
+  for (var o = 0; o < ondas.length; o++) ondas[o].setAttribute('d', dAtual);
+  var primeiro = atual[0], ultimo = atual[atual.length - 1];
+  $('terra').setAttribute('d', dAtual + 'L' + (ultimo[0] - 4000) + ' ' + ultimo[1] + 'L' + (primeiro[0] - 4000) + ' ' + primeiro[1] + 'Z');
+  $('erosao').setAttribute('d', dBase + linhaDe(atual.slice().reverse()).replace('M', 'L') + 'Z');
+}
+
+// desloca uma linha da costa para dentro da terra (d = distância em px do mapa)
+function desloca(pts, d) {
+  var out = [];
+  for (var i = 0; i < pts.length; i++) {
+    var a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    var t = normaliza(b[0] - a[0], b[1] - a[1]);
+    out.push([pts[i][0] - t.y * d, pts[i][1] + t.x * d]);
+  }
+  return out;
+}
+
+// sorteio fixo: a paisagem sai igual toda vez que a página abre
+var semente = 7;
+function sorteio() { semente = (semente * 16807) % 2147483647; return semente / 2147483647; }
+
+// ponto da costa original (amostra i) recuado "d" px para dentro da terra
+function terraEm(i, d) { var s = amostras[i]; return [s.x + s.nx * d, s.y + s.ny * d]; }
+
+// x da costa (original) na altura y; fora do trecho, usa a ponta mais próxima
+function costaX(y) {
+  if (y <= amostras[0].y) return amostras[0].x;
+  for (var i = 1; i < amostras.length; i++) if (amostras[i].y >= y) return amostras[i].x;
+  return amostras[amostras.length - 1].x;
+}
+
+function circulo(x, y, r) { return 'M' + (x - r).toFixed(1) + ' ' + y.toFixed(1) + 'a' + r + ' ' + r + ' 0 1 0 ' + 2 * r + ' 0a' + r + ' ' + r + ' 0 1 0 ' + -2 * r + ' 0'; }
+
+// ============================ SUPERFÍCIE ESTILO FOTO DE SATÉLITE ============================
+// Tudo que não muda (mar, morros, mata, cidades, lagoas, estradas, areia) é pintado UMA vez
+// num canvas e vira uma imagem. Mexer no mapa fica bem mais leve do que redesenhar milhares de formas.
+var costaAtual = [];
+var SUP = { x0: -1400, y0: -900, w: 2300, h: 3000, r: 0.75 };   // área pintada (em px do mapa) e resolução
+
+function caminho(c, pts) {
+  c.beginPath();
+  c.moveTo(pts[0][0], pts[0][1]);
+  for (var i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+}
+// círculo com borda suave. Cada cor vira um "carimbo" pequeno, desenhado uma vez e
+// depois só copiado no tamanho certo (muito mais rápido que criar um degradê por mancha)
+var carimbos = {};
+function mancha(c, x, y, r, cor) {
+  var cb = carimbos[cor];
+  if (!cb) {
+    cb = document.createElement('canvas');
+    cb.width = cb.height = 64;
+    var gc = cb.getContext('2d'), g = gc.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, cor); g.addColorStop(1, cor.replace(/[\d.]+\)$/, '0)'));   // mesma cor, transparente: sem borda cinza
+    gc.fillStyle = g;
+    gc.fillRect(0, 0, 64, 64);
+    carimbos[cor] = cb;
+  }
+  c.drawImage(cb, x - r, y - r, 2 * r, 2 * r);
+}
+
+// uma árvore vista de cima: sombra, copa com degradê e brilho no lado do sol
+function carimboArvore(cor, claro) {
+  var cv = document.createElement('canvas');
+  cv.width = cv.height = 32;
+  var c = cv.getContext('2d');
+  c.fillStyle = 'rgba(5,20,8,0.45)';
+  c.beginPath(); c.arc(19, 19, 11, 0, Math.PI * 2); c.fill();
+  var g = c.createRadialGradient(12, 12, 1, 15, 15, 12);
+  g.addColorStop(0, claro); g.addColorStop(1, cor);
+  c.fillStyle = g;
+  c.beginPath(); c.arc(15, 15, 11.5, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.12)';
+  c.beginPath(); c.arc(11, 11, 4, 0, Math.PI * 2); c.fill();
+  return cv;
+}
+
+function pintaSuperficie() {
+  var cv = document.createElement('canvas');
+  cv.width = Math.round(SUP.w * SUP.r);
+  cv.height = Math.round(SUP.h * SUP.r);
+  var c = cv.getContext('2d');
+  c.setTransform(SUP.r, 0, 0, SUP.r, -SUP.x0 * SUP.r, -SUP.y0 * SUP.r);
+  var n = amostras.length;
+
+  // 1) mar: verde-azulado perto da praia, azul mais fundo ao longe (como na foto aérea de Ilhéus)
+  var gm = c.createLinearGradient(120, 0, 1100, 0);
+  gm.addColorStop(0, '#4E9E98'); gm.addColorStop(0.15, '#2F8A98'); gm.addColorStop(0.5, '#23748F'); gm.addColorStop(1, '#1B5C82');
+  c.fillStyle = gm;
+  c.fillRect(SUP.x0, SUP.y0, SUP.w, SUP.h);
+  // água rasa: faixas largas e transparentes formam um degradê suave
+  c.lineJoin = 'round';
+  var rasos = [[200, 'rgba(70,150,140,0.25)'], [130, 'rgba(90,165,150,0.3)'], [80, 'rgba(120,185,165,0.35)'], [40, 'rgba(170,210,190,0.45)']];
+  for (var q = 0; q < rasos.length; q++) { caminho(c, costaAtual); c.lineWidth = rasos[q][0]; c.strokeStyle = rasos[q][1]; c.stroke(); }
+  // arrebentação larga: espuma colada na areia e várias linhas de onda quebrando
+  caminho(c, desloca(costaAtual, -10)); c.lineWidth = 22; c.strokeStyle = 'rgba(255,255,255,0.35)'; c.stroke();
+  for (var f = 0; f < 8; f++) {
+    caminho(c, desloca(costaAtual, -8 - f * 11 - sorteio() * 4));
+    c.setLineDash([18 + sorteio() * 40, 8 + f * 7 + sorteio() * 20]);
+    c.lineWidth = 4.5 - f * 0.45;
+    c.strokeStyle = 'rgba(255,255,255,' + (0.85 - f * 0.09).toFixed(2) + ')';
+    c.stroke();
+  }
+  c.setLineDash([]);
+  // espuma solta entre as ondas
+  for (var fe = 0; fe < 260; fe++) {
+    var ife = Math.floor(sorteio() * amostras.length), pfe = terraEm(ife, -10 - Math.pow(sorteio(), 1.8) * 60);
+    mancha(c, pfe[0], pfe[1], 3 + sorteio() * 5, 'rgba(255,255,255,0.6)');
+  }
+
+  // 2) terra: tudo a oeste da costa atual
+  var terra = costaAtual.slice();
+  terra.push([costaAtual[costaAtual.length - 1][0] - 4000, costaAtual[costaAtual.length - 1][1]]);
+  terra.push([costaAtual[0][0] - 4000, costaAtual[0][1]]);
+  caminho(c, terra); c.closePath();
+  c.fillStyle = '#2A4A2C'; c.fill();
+  c.save();
+  c.clip();
+
+  // 3) relevo: morros com sombra (luz vindo do noroeste); maiores longe do mar
+  for (var h = 0; h < 420; h++) {
+    var y = SUP.y0 + sorteio() * SUP.h;
+    var dist = 120 + Math.pow(sorteio(), 0.7) * 1500;
+    var x = costaX(y) - dist, r = 40 + sorteio() * 60 + dist * 0.06;
+    mancha(c, x + r * 0.35, y + r * 0.35, r, 'rgba(6,22,10,0.5)');
+    mancha(c, x - r * 0.3, y - r * 0.3, r * 0.75, 'rgba(120,160,90,0.4)');
+  }
+  // floresta: milhares de copas de árvore, cada uma com sombra, cor e brilho (carimbos prontos = rápido)
+  var copas = [carimboArvore('#2E5A30', '#5E8F4C'), carimboArvore('#24492A', '#4F7F45'), carimboArvore('#3A6B38', '#7AA35A'), carimboArvore('#1E3F25', '#3F6E3E')];
+  for (var cp2 = 0; cp2 < 16000; cp2++) {
+    var cy2 = SUP.y0 + sorteio() * SUP.h;
+    var cx2 = costaX(cy2) - 45 - Math.pow(sorteio(), 1.15) * 1750;
+    var tam = 9 + sorteio() * 9;
+    c.drawImage(copas[cp2 % 4], cx2 - tam / 2, cy2 - tam / 2, tam, tam);
+  }
+  // campos e pastos mais claros na baixada
+  for (var p = 0; p < 140; p++) {
+    var py = SUP.y0 + sorteio() * SUP.h, pd = 90 + sorteio() * 700;
+    mancha(c, costaX(py) - pd, py, 30 + sorteio() * 60, 'rgba(140,160,95,0.35)');
+  }
+  // lagoas escuras
+  var lg = [[indiceControle[5], 330, 40, 70], [indiceControle[12], 470, 30, 50], [indiceControle[2], 300, 26, 44], [indiceControle[15], 620, 50, 34]];
+  for (var l = 0; l < lg.length; l++) {
+    var c0 = terraEm(lg[l][0], lg[l][1]);
+    c.beginPath(); c.ellipse(c0[0], c0[1], lg[l][2], lg[l][3], 0.3, 0, Math.PI * 2);
+    c.fillStyle = '#1B3A3C'; c.fill(); c.lineWidth = 5; c.strokeStyle = 'rgba(70,110,70,0.8)'; c.stroke();
+  }
+
+  // 4) cidades: desenhadas à parte em vetor (montaCidades), para ficarem nítidas no zoom
+  // clareiras de areia alaranjada no meio da mata
+  for (var cl = 0; cl < 10; cl++) {
+    var ycl = SUP.y0 + 300 + sorteio() * (SUP.h - 600), pcl = [costaX(ycl) - 120 - sorteio() * 500, ycl];
+    mancha(c, pcl[0], pcl[1], 25 + sorteio() * 35, 'rgba(215,160,105,0.75)');
+  }
+
+  // 5) estradas: BA-001 paralela à costa e acessos para o interior
+  var estrada = desloca(costaAtual, 60);   // acompanha a costa atual, logo atrás da areia
+  caminho(c, estrada); c.lineWidth = 9; c.strokeStyle = '#5E605C'; c.stroke();
+  caminho(c, estrada); c.lineWidth = 1; c.strokeStyle = 'rgba(240,235,220,0.7)'; c.stroke();   // faixa do meio
+  // quiosques e barracas entre a estrada e a areia
+  var QUIOSQUE = ['#F2EEE6', '#C9603F', '#E8B04E', '#6E9FB0'];
+  var beira = desloca(costaAtual, 46);
+  for (var qq = 1; qq < beira.length - 1; qq += 2) {
+    if (sorteio() < 0.35) continue;
+    var pq = beira[qq];
+    c.fillStyle = QUIOSQUE[qq % 4]; c.fillRect(pq[0] - 2, pq[1] - 2, 4 + sorteio() * 2, 4);
+  }
+  for (var a = 0; a < 5; a++) {
+    var ia2 = indiceControle[2 + a * 3], ac = [];
+    for (var d = 150; d < 560; d += 50) { var pa = terraEm(ia2, d); ac.push([pa[0], pa[1] + Math.sin(d / 80 + a) * 26]); }
+    caminho(c, ac); c.lineWidth = 2.2; c.strokeStyle = 'rgba(170,165,150,0.55)'; c.stroke();
+  }
+  // canal que desce até o mar perto de Mamoã
+  var ic = indiceControle[5], canal = [];
+  for (var dc = 380; dc >= 0; dc -= 38) {
+    var cp = terraEm(ic + Math.round(Math.sin(dc / 60) * 2), dc);
+    canal.push([cp[0], cp[1] + Math.sin(dc / 45) * 14]);
+  }
+  caminho(c, canal); c.lineWidth = 5; c.strokeStyle = '#24575C'; c.stroke();
+
+  // 6) praia: faixa de areia clara e algumas dunas
+  caminho(c, desloca(costaAtual, 18)); c.lineWidth = 36; c.strokeStyle = '#EADCBD'; c.stroke();
+  caminho(c, desloca(costaAtual, 4)); c.lineWidth = 6; c.strokeStyle = '#CDBF9C'; c.stroke();   // areia molhada
+  for (var du = 0; du < 30; du++) {
+    var idu = Math.floor(sorteio() * n), pdu = terraEm(idu, 26 + sorteio() * 40);
+    mancha(c, pdu[0], pdu[1], 18 + sorteio() * 26, 'rgba(232,222,196,0.7)');
+  }
+  c.restore();
+
+  // 7) granulado leve de foto por cima de tudo
+  var gr = document.createElement('canvas');
+  gr.width = gr.height = 128;
+  var gc = gr.getContext('2d'), img = gc.createImageData(128, 128);
+  for (var i = 0; i < img.data.length; i += 4) {
+    var v = Math.floor(sorteio() * 255);
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255;
+  }
+  gc.putImageData(img, 0, 0);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'overlay';
+  c.globalAlpha = 0.07;
+  c.fillStyle = c.createPattern(gr, 'repeat');
+  c.fillRect(0, 0, cv.width, cv.height);
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+
+  // vira imagem dentro do SVG
+  var sup = $('superficie');
+  sup.setAttribute('x', SUP.x0); sup.setAttribute('y', SUP.y0);
+  sup.setAttribute('width', SUP.w); sup.setAttribute('height', SUP.h);
+  if (cv.toBlob) {
+    cv.toBlob(function (blob) { sup.setAttribute('href', URL.createObjectURL(blob)); }, 'image/jpeg', 0.88);
+  } else {
+    sup.setAttribute('href', cv.toDataURL('image/jpeg', 0.88));
+  }
+}
+
+function montaLocais() {
+  var n = amostras.length, ic = indiceControle[5];
+  // 5) nomes de lugares em amarelo (como os morros no mapa de referência)
+  var locais = [
+    ['Rodovia BA-001', terraEm(Math.floor(n * 0.38), 75)],
+    ['Vila São Miguel', terraEm(indiceControle[14], 230)],
+    ['Vila São Domingos', terraEm(indiceControle[11], 220)],
+    ['Coqueiral', terraEm(indiceControle[10], 150)],
+    ['Canal', terraEm(ic, 260)],
+    ['Restinga', terraEm(Math.floor(n * 0.14), 120)]
+  ];
+  for (var L = 0; L < locais.length; L++) {
+    var gl = el('g', {});
+    var tx = el('text', { 'class': 'rotulo-local', x: 0, y: 0, 'text-anchor': 'middle' });
+    tx.textContent = locais[L][0];
+    gl.appendChild(tx);
+    $('locais').appendChild(gl);
+    rotulosPraia.push({ g: gl, x: locais[L][1][0], y: locais[L][1][1] });
+  }
+}
+
+// ============================ PORTO E CALOR ============================
+var PORTO = { x: 0, y: 0 };
+
+function rotuloMapa(texto, classe, p, ancora) {   // rótulo que fica sempre de pé na tela
+  var g = el('g', {}), t = el('text', { 'class': classe, x: 0, y: 0, 'text-anchor': ancora || 'middle' });
+  t.textContent = texto;
+  g.appendChild(t);
+  $('porto').appendChild(g);
+  rotulosPraia.push({ g: g, x: p[0], y: p[1] });
+}
+
+// Porto do Ilheus, ao sul de São Miguel: aterro, píer, molhe, navio, areia acumulada e setas da deriva
+function montaPorto() {
+  var z0 = amostras[amostras.length - 1], z1 = amostras[amostras.length - 2];
+  var t = normaliza(z0.x - z1.x, z0.y - z1.y);   // ao longo da costa, para o sul
+  var nx = -t.y, ny = t.x;                        // para a terra (negativo = mar)
+  var em = function (a, d) { return [z0.x + t.x * a + nx * d, z0.y + t.y * a + ny * d]; };
+  var pt = function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); };
+  var poli = function (lista) { var d = 'M' + pt(lista[0]); for (var i = 1; i < lista.length; i++) d += 'L' + pt(lista[i]); return d + 'Z'; };
+  var g = $('porto');
+  // areia que se acumulou ao sul do molhe (a praia cresceu ali)
+  g.appendChild(el('path', { d: 'M' + pt(em(150, 2)) + 'L' + pt(em(150, -105)) + 'Q' + pt(em(320, -70)) + ' ' + pt(em(600, 2)) + 'Z', fill: '#EADCBD' }));
+  // aterro do porto com pátios
+  g.appendChild(el('path', { d: poli([em(90, 12), em(175, 12), em(175, -115), em(90, -115)]), fill: '#8D9095' }));
+  var conteiner = ['#C9603F', '#4F7FA0', '#E8B04E', '#D8D4CC'], pat = '';
+  for (var ca = 0; ca < 4; ca++) for (var cd = 0; cd < 5; cd++) {
+    g.appendChild(el('path', { d: poli([em(100 + ca * 18, -10 - cd * 20), em(112 + ca * 18, -10 - cd * 20), em(112 + ca * 18, -24 - cd * 20), em(100 + ca * 18, -24 - cd * 20)]), fill: conteiner[(ca + cd) % 4] }));
+  }
+  // píer e navio atracado
+  g.appendChild(el('path', { d: poli([em(100, -115), em(122, -115), em(122, -240), em(100, -240)]), fill: '#A3A7AC' }));
+  g.appendChild(el('path', { d: poli([em(78, -130), em(96, -135), em(96, -225), em(87, -238), em(78, -225)]), fill: '#F2F0EA', stroke: '#5E605C', 'stroke-width': 1.5 }));
+  g.appendChild(el('path', { d: poli([em(81, -150), em(93, -150), em(93, -170), em(81, -170)]), fill: '#C9603F' }));
+  // molhe (quebra-mar) que avança no mar e se curva para o norte
+  var molhe = 'M' + pt(em(140, -115)) + 'L' + pt(em(150, -300)) + 'Q' + pt(em(120, -345)) + ' ' + pt(em(-40, -340));
+  g.appendChild(el('path', { d: molhe, fill: 'none', stroke: '#5F6368', 'stroke-width': 16, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  g.appendChild(el('path', { d: molhe, fill: 'none', stroke: '#BFC3C7', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  // deriva de areia: forte ao sul (vem e fica presa), fraca ao norte (falta areia)
+  for (var f = 0; f < 3; f++) {
+    var dd = -120 - f * 45;
+    g.appendChild(el('path', { 'class': 'fluxo', d: 'M' + pt(em(820 - f * 40, dd)) + 'L' + pt(em(220, dd)), 'marker-end': 'url(#seta)' }));
+  }
+  // ao norte do porto as setas acompanham a curva da costa
+  var na = amostras.length;
+  for (var k = 0; k < 2; k++) {
+    var lin = [], ini = na - 4, fim = Math.max(0, na - 70 - k * 15);
+    for (var ia = ini; ia >= fim; ia -= 3) lin.push(terraEm(ia, -110 - k * 50));
+    var dl = 'M' + pt(lin[0]);
+    for (var q = 1; q < lin.length; q++) dl += 'L' + pt(lin[q]);
+    g.appendChild(el('path', { 'class': 'fluxo fraco', d: dl, 'marker-end': 'url(#seta)' }));
+  }
+  rotuloMapa('Porto do Ilheus', 'rotulo-porto', em(60, -400));
+  rotuloMapa('Areia vinda do sul fica presa no molhe', 'rotulo-fluxo', em(560, -250));
+  rotuloMapa('Pouca areia segue para o norte', 'rotulo-fluxo', terraEm(amostras.length - 62, -290));
+  rotuloMapa('Areia acumulada', 'rotulo-fluxo', em(330, -40));
+  PORTO = { x: em(60, -340)[0], y: em(150, -100)[1] };
+}
+
+// pontos de calor nos trechos com erosão + relatos espalhados em volta de cada ponto
+function montaCalor() {
+  var g = $('calor');
+  var COR_GRAV = ['#7FD1C4', '#F2A65A', '#E0603A'];
+  for (var i = 0; i < PONTOS.length; i++) {
+    var p = PONTOS[i], st = statusAtual(p), s = amostras[p.iAmostra];
+    var r = recuoEm(s.s, ULT) * PX_METRO;
+    var cx = s.x + s.nx * r, cy = s.y + s.ny * r;
+    if (st !== 'est') {
+      g.appendChild(el('circle', { 'class': st === 'crit' ? 'calor-crit' : '', cx: cx.toFixed(1), cy: cy.toFixed(1), r: (26 + p.recuo[ULT] * 2.2).toFixed(1), fill: st === 'crit' ? 'url(#calorCrit)' : 'url(#calorAten)' }));
+    }
+    // cada relato das últimas 3 marés grandes vira um pontinho perto do trecho (posição de exemplo)
+    for (var j = 0; j < p.relatos.length; j++) {
+      var rel = p.relatos[j];
+      if (rel.t < ULT - 2) continue;
+      var ia = Math.max(0, Math.min(amostras.length - 1, p.iAmostra + Math.round((sorteio() - 0.5) * 12)));
+      var sa = amostras[ia], off = recuoEm(sa.s, ULT) * PX_METRO + 4 + sorteio() * 20;
+      g.appendChild(el('circle', { cx: (sa.x + sa.nx * off).toFixed(1), cy: (sa.y + sa.ny * off).toFixed(1), r: 5, fill: COR_GRAV[rel.sev], stroke: '#fff', 'stroke-width': 1.5 }));
+    }
+  }
+}
+
+// ============================ CIDADES (VETOR) ============================
+// Bairros em quadras alinhadas com a costa: ruas, quintais, casas com telhado de duas águas,
+// prédios com sombra comprida e árvores nos quintais. Cada cor vira um único <path> (leve).
+function montaCidades() {
+  // [amostra do centro, meia largura ao longo da costa, profundidade inicial, final, chance de prédio, deslocamento para o sul]
+  var bairros = [
+    [indiceControle[14], 150, 78, 430, 0.35, 0],    // São Miguel
+    [indiceControle[11], 120, 78, 340, 0.2, 0],     // São Domingos
+    [indiceControle[7], 70, 78, 190, 0.08, 0],      // Ponta da Tulha
+    [indiceControle[5], 60, 260, 420, 0.05, 0],     // condomínio atrás de Mamoã
+    [indiceControle[3], 75, 78, 200, 0.3, 0],       // Joia do Atlântico
+    [indiceControle[1], 50, 78, 160, 0.05, 0],      // Ponta do Ramo
+    [amostras.length - 1, 280, 70, 620, 0.45, 340]  // centro de Ilhéus, ao sul do porto
+  ];
+  var QUADRA = 44, RUA = 7, LOTE = QUADRA / 3;
+  var d = { rua: '', quadra: '', quintal: '', sombra: '', sombraPredio: '', arvore: '', arvoreSombra: '', predio: '', topo: '', piscina: '' };
+  var TELHAS = [['#D2734F', '#A9533A'], ['#C4623F', '#954431'], ['#E3DED4', '#B9B3A7'], ['#B8B4AB', '#8E8A82'], ['#DB8B5E', '#B0663F']];
+  var telhaClara = ['', '', '', '', ''], telhaEscura = ['', '', '', '', ''];
+  var f = function (n) { return n.toFixed(1); };
+  for (var b = 0; b < bairros.length; b++) {
+    var z = bairros[b], s0 = amostras[z[0]];
+    var nx = s0.nx, ny = s0.ny, tx = ny, ty = -nx;   // n = para a terra, t = ao longo da costa (sul)
+    var em = function (a, dd) { a += z[5]; return [s0.x + tx * a + nx * dd, s0.y + ty * a + ny * dd]; };
+    var ret = function (a, dd, w, h) {
+      var p1 = em(a, dd), p2 = em(a + w, dd), p3 = em(a + w, dd + h), p4 = em(a, dd + h);
+      return 'M' + f(p1[0]) + ' ' + f(p1[1]) + 'L' + f(p2[0]) + ' ' + f(p2[1]) + 'L' + f(p3[0]) + ' ' + f(p3[1]) + 'L' + f(p4[0]) + ' ' + f(p4[1]) + 'Z';
+    };
+    var naTerra = function (a, dd) { var p = em(a, dd); return p[0] < costaX(p[1]) - 70; };
+    for (var a = -z[1]; a + QUADRA <= z[1]; a += QUADRA + RUA) {
+      for (var dd = z[2]; dd + QUADRA <= z[3]; dd += QUADRA + RUA) {
+        if (!naTerra(a, dd) || !naTerra(a + QUADRA, dd)) continue;
+        var bordaBairro = (Math.abs(a) + QUADRA > z[1] * 0.75 || dd + QUADRA > z[3] - 40);
+        if (bordaBairro && sorteio() < 0.45) continue;            // borda irregular, a mata entra no bairro
+        d.rua += ret(a - RUA, dd - RUA, QUADRA + 2 * RUA, QUADRA + 2 * RUA);
+        if (sorteio() < 0.1) {                                    // praça ou quadra de mata
+          d.quintal += ret(a, dd, QUADRA, QUADRA);
+          for (var m = 0; m < 6; m++) {
+            var pa = em(a + 6 + sorteio() * 32, dd + 6 + sorteio() * 32), ra = 4 + sorteio() * 3;
+            d.arvoreSombra += circ(pa[0] + 1.6, pa[1] + 1.6, ra); d.arvore += circ(pa[0], pa[1], ra);
+          }
+          continue;
+        }
+        d.quadra += ret(a, dd, QUADRA, QUADRA);
+        var frente = dd < z[2] + 100;                             // primeiras quadras perto da praia
+        if (sorteio() < z[4] * (frente ? 1.6 : 0.6)) {            // quadra de prédios
+          for (var pp = 0; pp < 2; pp++) {
+            var pa2 = a + 3 + pp * 21, w = 17, h = 30 - sorteio() * 8;
+            var alt = 6 + sorteio() * 8;                          // sombra maior = prédio mais alto
+            d.sombraPredio += ret(pa2 + alt * 0.6, dd + 6 + alt * 0.6, w, h);
+            d.predio += ret(pa2, dd + 6, w, h);
+            d.topo += ret(pa2 + 4, dd + 10, 6, 5);
+            if (sorteio() < 0.4) d.piscina += ret(pa2 + 3, dd + h + 8 - 6, 8, 4);
+          }
+          continue;
+        }
+        for (var la = 0; la < 3; la++) for (var ld = 0; ld < 3; ld++) {
+          var x0 = a + la * LOTE, y0 = dd + ld * LOTE;
+          if (sorteio() < 0.12) {                                 // lote com árvore no lugar da casa
+            var pq = em(x0 + LOTE / 2, y0 + LOTE / 2);
+            d.arvoreSombra += circ(pq[0] + 1.4, pq[1] + 1.4, 4.2); d.arvore += circ(pq[0], pq[1], 4.2);
+            continue;
+          }
+          var hw = 8 + sorteio() * 3, hh = 6 + sorteio() * 3, ox = x0 + (LOTE - hw) / 2, oy = y0 + 1.5;
+          var cor = Math.floor(sorteio() * TELHAS.length);
+          d.sombra += ret(ox + 1.8, oy + 1.8, hw, hh);
+          // telhado de duas águas: metade clara (sol) e metade escura, divididas pela cumeeira
+          telhaClara[cor] += ret(ox, oy, hw, hh / 2);
+          telhaEscura[cor] += ret(ox, oy + hh / 2, hw, hh / 2);
+          if (sorteio() < 0.35) { var pr = em(x0 + LOTE / 2 + 3, y0 + LOTE - 2.5); d.arvore += circ(pr[0], pr[1], 2.6); }
+        }
+      }
+    }
+  }
+  var g = $('cidade');
+  var camada = function (dd, cor, extra) { if (!dd) return; var e = { d: dd, fill: cor }; for (var k in extra) e[k] = extra[k]; g.appendChild(el('path', e)); };
+  camada(d.rua, '#8E8B84');
+  camada(d.quadra, '#CFC3A6');
+  camada(d.quintal, '#6F8F55');
+  camada(d.arvoreSombra, '#0F2414', { 'fill-opacity': 0.45 });
+  camada(d.sombra, '#2B2A25', { 'fill-opacity': 0.45 });
+  camada(d.sombraPredio, '#1E1D1A', { 'fill-opacity': 0.5 });
+  for (var t = 0; t < TELHAS.length; t++) { camada(telhaClara[t], TELHAS[t][0]); camada(telhaEscura[t], TELHAS[t][1]); }
+  camada(d.predio, '#ECEAE4', { stroke: '#BDB8AE', 'stroke-width': 0.8 });
+  camada(d.topo, '#9FA8AD');
+  camada(d.piscina, '#5EC6D6');
+  camada(d.arvore, '#3F7A3E');
+}
+function circ(x, y, r) { return 'M' + (x - r).toFixed(1) + ' ' + y.toFixed(1) + 'a' + r + ' ' + r + ' 0 1 0 ' + (2 * r) + ' 0a' + r + ' ' + r + ' 0 1 0 ' + (-2 * r) + ' 0'; }
+
+function pontosFiltrados() {
+  var lista = [];
+  for (var i = 0; i < PONTOS.length; i++) {
+    var p = PONTOS[i];
+    if (filtro.status !== 'todos' && statusAtual(p) !== filtro.status) continue;
+    if (filtro.praia !== 'todas' && p.praia !== filtro.praia) continue;
+    lista.push(p);
+  }
+  return lista;
+}
+
+function atualizaMarcadores() {
+  var visiveis = pontosFiltrados();
+  for (var m = 0; m < marcadores.length; m++) {
+    var p = marcadores[m].ponto;
+    var sel = (modo === 'publico' ? selecionado : selG) === p.id;
+    var apagado = modo === 'gestor' && visiveis.indexOf(p) < 0;
+    marcadores[m].g.setAttribute('class', 'marcador ' + statusAtual(p) + (sel ? ' sel' : '') + (apagado ? ' apagado' : ''));
+  }
+}
+
+// ============================ CÂMERA ============================
+function medir() {
+  largura = plano.clientWidth;
+  altura = plano.clientHeight;
+  mapa.setAttribute('width', largura);
+  mapa.setAttribute('height', altura);
+}
+function limita(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function cosInc() { return Math.cos(view.tilt * INCLINACAO * Math.PI / 180); }
+
+function desenha() {
+  var k = view.k;
+  var graus = view.rumo * 180 / Math.PI;
+  mundoG.setAttribute('transform', 'translate(' + (largura / 2).toFixed(1) + ' ' + (altura / 2).toFixed(1) + ') rotate(' + graus.toFixed(2) + ') scale(' + k + ') translate(' + (-view.cx).toFixed(2) + ' ' + (-view.cy).toFixed(2) + ')');
+  plano.style.transform = 'rotateX(' + (view.tilt * INCLINACAO).toFixed(2) + 'deg)';
+  $('ceu').style.opacity = (view.tilt * 0.9).toFixed(2);
+  // marcadores ficam de pé e na vertical da tela, mesmo com o mapa girado ou inclinado
+  var c = cosInc();
+  var fim = ' rotate(' + (-graus).toFixed(2) + ') scale(' + (1 / k).toFixed(4) + ' ' + (1 / (k * c)).toFixed(4) + ')';
+  for (var i = 0; i < marcadores.length; i++) {
+    var p = marcadores[i].ponto;
+    marcadores[i].g.setAttribute('transform', 'translate(' + p.mx.toFixed(1) + ' ' + p.my.toFixed(1) + ')' + fim);
+  }
+  for (var j = 0; j < rotulosPraia.length; j++) {
+    var r = rotulosPraia[j];
+    r.g.setAttribute('transform', 'translate(' + r.x.toFixed(1) + ' ' + r.y.toFixed(1) + ')' + fim);
+  }
+  app.classList.toggle('zoom-perto', k >= 1.6);
+  $('agulha').style.transform = 'rotate(' + graus.toFixed(1) + 'deg)';
+  // desempenho: pausa as ondas e o pulso enquanto o mapa se move
+  app.classList.add('mexendo');
+  clearTimeout(tempoParado);
+  tempoParado = setTimeout(function () { app.classList.remove('mexendo'); }, 300);
+}
+var tempoParado = null;
+
+// enquadra os 8 pontos dentro do cartão do mapa público
+function focoPublico() {
+  var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (var i = 0; i < PONTOS.length; i++) {
+    x0 = Math.min(x0, PONTOS[i].mx); x1 = Math.max(x1, PONTOS[i].mx);
+    y0 = Math.min(y0, PONTOS[i].my); y1 = Math.max(y1, PONTOS[i].my);
+  }
+  y1 = Math.max(y1, PORTO.y + 60);   // o porto aparece na visão geral
+  // sobra 90 px em cima (selo) e 90 px embaixo (legenda)
+  FOCO.k = limita(Math.min((palco.clientHeight - 180) / (y1 - y0 + 40), palco.clientWidth * 0.85 / (x1 - x0 + 300)), 0.25, 1.2);
+  FOCO.cx = (x0 + x1) / 2 + palco.clientWidth * 0.14 / FOCO.k;   // costa à esquerda, mar à direita com os nomes das praias
+  FOCO.cy = (y0 + y1) / 2;
+}
+
+var pedido = false;
+function pedirDesenho() {
+  if (pedido) return;
+  pedido = true;
+  requestAnimationFrame(function () { pedido = false; desenha(); });
+}
+
+var anims = {};
+function animar(nome, de, para, ms, aoMudar) {
+  if (reduzMovimento) ms = 0;
+  var inicio = performance.now();
+  var minha = {};
+  anims[nome] = minha;
+  function passo(agora) {
+    if (anims[nome] !== minha) return;
+    var p = ms === 0 ? 1 : Math.min(1, (agora - inicio) / ms);
+    var e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+    var valores = [];
+    for (var i = 0; i < de.length; i++) valores.push(de[i] + (para[i] - de[i]) * e);
+    aoMudar(valores);
+    if (p < 1) requestAnimationFrame(passo);
+  }
+  requestAnimationFrame(passo);
+}
+
+// deslocaTela: fração da altura da tela para deslocar o ponto para cima (folha aberta)
+function voarPara(x, y, k, ms, deslocaTela) {
+  var kk = limita(k, 0.3, 7);
+  var d = (deslocaTela || 0) * palco.clientHeight / kk / cosInc();
+  var cx = x + d * Math.sin(view.rumo);
+  var cy = y + d * Math.cos(view.rumo);
+  animar('vista', [view.cx, view.cy, Math.log(view.k)], [cx, cy, Math.log(kk)], ms, function (v) {
+    view.cx = v[0]; view.cy = v[1]; view.k = Math.exp(v[2]); desenha();
+  });
+}
+function girarPara(rumo, tilt, ms) {
+  var r = ((view.rumo + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  view.rumo = r;
+  animar('giro', [r, view.tilt], [rumo, tilt], ms, function (v) { view.rumo = v[0]; view.tilt = v[1]; desenha(); });
+}
+function kVisaoGeral() { return Math.min(0.5, palco.clientHeight / 1350); }
+
+// ============================ MAPA PÚBLICO ============================
+function cenaSVG(m) {
+  var x = 120 - m * 2.6;
+  var areia = x > 72 ? x - 72 : 0;
+  var borda = 'M' + x + ' 0 Q' + (x + 7) + ' 12 ' + x + ' 25 T' + x + ' 50 T' + x + ' 75 T' + x + ' 100';
+  var s = '<svg viewBox="0 0 160 100" role="img" aria-label="Foto de exemplo: faixa de areia entre a terra e o mar">';
+  s += '<rect width="160" height="100" fill="#8FA67B"/>';
+  s += '<circle cx="14" cy="22" r="9" fill="#5E7E55"/><circle cx="26" cy="72" r="11" fill="#5E7E55"/><circle cx="9" cy="90" r="7" fill="#5E7E55"/>';
+  s += '<rect x="72" y="0" width="' + areia + '" height="100" fill="#E8D5A8"/>';
+  s += '<rect x="40" y="38" width="22" height="24" rx="2" fill="#F6F1E7" stroke="#4A5568" stroke-width="1"/><path d="M37 40 L51 28 L65 40Z" fill="#B4532A"/>';
+  s += '<path d="' + borda + 'L160 100L160 0Z" fill="#2B7C93" fill-opacity="0.93"/>';
+  s += '<path d="' + borda + '" fill="none" stroke="#E9F7F5" stroke-width="2"/>';
+  s += '<text x="138" y="52" font-size="8" fill="#fff" fill-opacity="0.75" text-anchor="middle" font-family="DM Sans, sans-serif">mar</text>';
+  s += '<text x="12" y="52" font-size="8" fill="#fff" fill-opacity="0.8" text-anchor="middle" font-family="DM Sans, sans-serif">terra</text>';
+  return s + '</svg>';
+}
+
+function graficoRecuo(p) {
+  var s = '<svg viewBox="0 0 260 96" role="img" aria-label="Recuo acumulado da costa em cada maré grande">';
+  var yDe = function (v) { return 74 - v / 30 * 56; };
+  s += '<line x1="14" y1="' + yDe(12) + '" x2="250" y2="' + yDe(12) + '" stroke="#B4532A" stroke-width="1" stroke-dasharray="4 3"/>';
+  s += '<text x="250" y="' + (yDe(12) - 4) + '" font-size="9" text-anchor="end" fill="#8A3A18" font-family="DM Sans, sans-serif">nível crítico: 12 m</text>';
+  s += '<line x1="14" y1="74" x2="250" y2="74" stroke="#cfc6b3" stroke-width="1"/>';
+  var pts = '';
+  for (var i = 0; i < 5; i++) pts += (30 + i * 50) + ',' + yDe(p.recuo[i]) + ' ';
+  s += '<polyline points="' + pts + '" fill="none" stroke="#0F2A3A" stroke-width="2.2" stroke-linejoin="round"/>';
+  for (var j = 0; j < 5; j++) {
+    var ultimo = j === 4;
+    var st = statusDe(p.recuo[j]);
+    var cor = st === 'crit' ? '#B4532A' : (st === 'aten' ? '#F2A65A' : '#1F7A70');
+    s += '<circle cx="' + (30 + j * 50) + '" cy="' + yDe(p.recuo[j]) + '" r="' + (ultimo ? 6 : 3.5) + '" fill="' + cor + '" stroke="#0F2A3A" stroke-width="' + (ultimo ? 2 : 1) + '"/>';
+    s += '<text x="' + (30 + j * 50) + '" y="' + (yDe(p.recuo[j]) - 10) + '" font-size="10" text-anchor="middle" font-weight="700" fill="#0F2A3A" font-family="DM Sans, sans-serif">' + p.recuo[j] + ' m</text>';
+    s += '<text x="' + (30 + j * 50) + '" y="90" font-size="9.5" text-anchor="middle" fill="#4A5568" font-family="DM Sans, sans-serif">' + MARES[j].slice(0, 5) + '</text>';
+  }
+  return s + '</svg>';
+}
+
+function acharPonto(id) {
+  for (var i = 0; i < PONTOS.length; i++) if (PONTOS[i].id === id) return PONTOS[i];
+  return null;
+}
+function textoConfianca(r) {
+  var viz = r.conf === 0 ? 'sem confirmação de vizinhos' : (r.conf === 1 ? '1 vizinho confirmou' : r.conf + ' vizinhos confirmaram');
+  return 'Localização enviada na hora · ' + (r.conferida ? 'maré e onda conferidas' : 'maré e onda ainda não conferidas') + ' · ' + viz;
+}
+
+function renderFolha() {
+  var p = acharPonto(selecionado);
+  if (!p) return;
+  var r = p.relatos[p.relatos.length - 1];
+  var m = p.recuo[ULT];
+  var st = statusDe(m);
+  var h = '<div class="alca"></div>';
+  h += '<button class="fechar" id="btnFechar" type="button" aria-label="Fechar detalhe">' + ICONE_X + '</button>';
+  h += '<p class="praia">' + p.praia + '</p><h2>' + p.nome + '</h2>';
+  h += '<div class="linha-status"><span class="selo ' + st + '">' + glifo(st, 18) + NOMES[st] + '</span><span class="mini">Recuo acumulado: ' + m + ' m desde 15/06 (exemplo)</span></div>';
+  h += '<div class="cena">' + cenaSVG(p.recuo[r.t]) + '</div>';
+  h += '<p class="nota">Foto de exemplo · ' + r.data + '</p>';
+  h += '<div class="relato"><p class="tag">Último relato · Relato da comunidade · ' + r.data + '</p>';
+  h += '<p class="texto-relato">“' + r.texto + '”</p>';
+  h += '<div class="chips-info"><span>Onda ' + virgula(r.onda) + ' m</span><span>Maré ' + virgula(r.mare) + ' m</span><span class="' + r.nivel + '">Confiança ' + r.nivel + '</span></div>';
+  h += '<p class="selo-conf">' + textoConfianca(r) + '</p></div>';
+  h += '<h3>Recuo em cada maré grande</h3><div class="grafico">' + graficoRecuo(p) + '</div>';
+  h += '<h3>Linha do tempo das fotos, da mais antiga à mais recente</h3><div class="linha-tempo">';
+  for (var i = 0; i < p.relatos.length; i++) {
+    var q = p.relatos[i];
+    h += '<div class="cartao-tempo' + (i === p.relatos.length - 1 ? ' ultimo' : '') + '">' + cenaSVG(p.recuo[q.t]) + '<div><b>' + q.data.slice(0, 5) + '</b><small>' + q.texto + '</small></div></div>';
+  }
+  h += '</div><p class="privacidade">Os relatos não mostram nome nem telefone de quem enviou (LGPD). Fotos e valores são exemplos para demonstração.</p>';
+  folha.innerHTML = h;
+}
+
+function abrirFolha(id) {
+  selecionado = id;
+  var p = acharPonto(id);
+  app.classList.add('com-folha');
+  folha.classList.add('aberta');
+  folha.setAttribute('aria-hidden', 'false');
+  renderFolha();
+  folha.scrollTop = 0;
+  atualizaMarcadores();
+  $('moldura').scrollIntoView({ behavior: reduzMovimento ? 'auto' : 'smooth', block: 'start' });
+  voarPara(p.mx, p.my, Math.max(view.k, 2.6), 1000, 0.25);
+  if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) { } }
+}
+function fecharFolha() {
+  selecionado = null;
+  app.classList.remove('com-folha');
+  folha.classList.remove('aberta');
+  folha.setAttribute('aria-hidden', 'true');
+  atualizaMarcadores();
+}
+folha.addEventListener('click', function (e) { if (e.target.closest('#btnFechar')) fecharFolha(); });
+
+// ============================ PAINEL DO GESTOR ============================
+function noPeriodo(r) {
+  if (filtro.periodo === 'mes') return r.t >= ULT;
+  if (filtro.periodo === 'tres') return r.t >= ULT - 2;
+  return true;
+}
+function relatosDoPeriodo(p) { return p.relatos.filter(noPeriodo); }
+var ORDEM = { crit: 0, aten: 1, est: 2 };
+function ordenados(lista) {
+  return lista.slice().sort(function (a, b) {
+    var d = ORDEM[statusAtual(a)] - ORDEM[statusAtual(b)];
+    return d !== 0 ? d : b.recuo[ULT] - a.recuo[ULT];
+  });
+}
+
+function renderKpis() {
+  var mes = [], crit = 0, cobertos = 0;
+  for (var i = 0; i < PONTOS.length; i++) {
+    var p = PONTOS[i];
+    if (statusAtual(p) === 'crit') crit++;
+    var doMes = p.relatos.filter(function (r) { return r.t === ULT; });
+    if (doMes.length > 0) cobertos++;
+    mes = mes.concat(doMes);
+  }
+  var conf = mes.filter(function (r) { return r.conf >= 2; }).length;
+  var pct = Math.round(conf / mes.length * 100);
+  var itens = [
+    ['Pontos críticos', crit, 'de ' + PONTOS.length + ' pontos monitorados'],
+    ['Relatos no mês', mes.length, 'última maré grande, 10/10'],
+    ['Relatos confirmados', pct + '%', '2 ou mais vizinhos confirmaram'],
+    ['Cobertura', cobertos + ' de ' + PONTOS.length, 'pontos com relato no mês']
+  ];
+  var h = '';
+  for (var j = 0; j < itens.length; j++) h += '<div class="kpi"><span>' + itens[j][0] + '</span><b>' + itens[j][1] + '</b><small>' + itens[j][2] + ' · exemplo</small></div>';
+  $('kpis').innerHTML = h;
+  $('nRelatos').textContent = mes.length;
+}
+
+function montaFiltros() {
+  var praias = [];
+  for (var i = 0; i < PONTOS.length; i++) if (praias.indexOf(PONTOS[i].praia) < 0) praias.push(PONTOS[i].praia);
+  var opc = function (v, t) { return '<option value="' + v + '">' + t + '</option>'; };
+  $('selStatus').innerHTML = opc('todos', 'Todos') + opc('crit', 'Crítico') + opc('aten', 'Atenção') + opc('est', 'Estável');
+  var hp = opc('todas', 'Todas as praias');
+  for (var j = 0; j < praias.length; j++) hp += opc(praias[j], praias[j]);
+  $('selPraia').innerHTML = hp;
+  $('selPeriodo').innerHTML = opc('todo', 'Jun a out/2026') + opc('tres', 'Últimas 3 marés grandes') + opc('mes', 'Última maré grande');
+  var aoMudar = function () {
+    filtro.status = $('selStatus').value; filtro.praia = $('selPraia').value; filtro.periodo = $('selPeriodo').value;
+    var vis = pontosFiltrados();
+    if (vis.indexOf(acharPonto(selG)) < 0) selG = vis.length ? ordenados(vis)[0].id : null;
+    renderGestor();
+    enquadrar(vis);
+  };
+  $('selStatus').addEventListener('change', aoMudar);
+  $('selPraia').addEventListener('change', aoMudar);
+  $('selPeriodo').addEventListener('change', aoMudar);
+}
+
+function enquadrar(lista) {
+  if (!lista.length) return;
+  var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (var i = 0; i < lista.length; i++) {
+    x0 = Math.min(x0, lista[i].mx); x1 = Math.max(x1, lista[i].mx);
+    y0 = Math.min(y0, lista[i].my); y1 = Math.max(y1, lista[i].my);
+  }
+  var k = lista.length === PONTOS.length ? kVisaoGeral() : limita(Math.min(palco.clientHeight * 0.6 / (y1 - y0 + 90), palco.clientWidth * 0.6 / (x1 - x0 + 90)), 0.4, 1.3);
+  voarPara((x0 + x1) / 2, (y0 + y1) / 2, k, 900);
+}
+
+function renderLista() {
+  var lista = ordenados(pontosFiltrados());
+  if (!lista.length) { $('lista').innerHTML = '<li class="vazio">Nenhum ponto com esses filtros.</li>'; return; }
+  var h = '';
+  for (var i = 0; i < lista.length; i++) {
+    var p = lista[i], st = statusAtual(p), n = relatosDoPeriodo(p).length;
+    h += '<li><button type="button" data-id="' + p.id + '"' + (p.id === selG ? ' aria-current="true"' : '') + '>' + glifo(st, 22);
+    h += '<span><strong>' + p.nome + '</strong><small>' + p.praia + ' · ' + NOMES[st] + '</small></span>';
+    h += '<span class="dir"><strong>' + p.recuo[ULT] + ' m</strong><small>' + n + (n === 1 ? ' relato' : ' relatos') + '</small></span></button></li>';
+  }
+  $('lista').innerHTML = h;
+}
+$('lista').addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (!b) return;
+  escolherG(+b.getAttribute('data-id'), true);
+});
+
+function graficoGraves(p) {
+  var graves = [0, 0, 0, 0, 0], max = 3;
+  for (var i = 0; i < p.relatos.length; i++) if (p.relatos[i].sev === 2) graves[p.relatos[i].t]++;
+  for (var g = 0; g < 5; g++) if (graves[g] > max) max = graves[g];
+  var x = function (t) { return 40 + t * 62; };
+  var y = function (v) { return 24 + (1 - v / max) * 100; };
+  var s = '<svg viewBox="0 0 310 170" role="img" aria-label="Relatos graves por maré grande: ' + graves.join(', ') + '">';
+  for (var v = 0; v <= max; v++) {
+    s += '<line x1="34" y1="' + y(v) + '" x2="296" y2="' + y(v) + '" stroke="#E3DAC6" stroke-width="1"/>';
+    s += '<text x="26" y="' + (y(v) + 4) + '" font-size="11" text-anchor="end" fill="#4A5568" font-family="DM Sans, sans-serif">' + v + '</text>';
+  }
+  var area = 'M' + x(0) + ' ' + y(0);
+  var linha = '';
+  for (var t = 0; t < 5; t++) { linha += (t ? 'L' : 'M') + x(t) + ' ' + y(graves[t]); area += 'L' + x(t) + ' ' + y(graves[t]); }
+  area += 'L' + x(4) + ' ' + y(0) + 'Z';
+  s += '<path d="' + area + '" fill="#B4532A" fill-opacity="0.14"/>';
+  s += '<path d="' + linha + '" fill="none" stroke="#B4532A" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
+  for (var q = 0; q < 5; q++) {
+    var fim = q === 4;
+    s += '<circle cx="' + x(q) + '" cy="' + y(graves[q]) + '" r="' + (fim ? 6.5 : 4) + '" fill="' + (fim ? '#B4532A' : '#fff') + '" stroke="#B4532A" stroke-width="2.2"/>';
+    s += '<text x="' + x(q) + '" y="' + (y(graves[q]) - 12) + '" font-size="12" font-weight="700" text-anchor="middle" fill="#0F2A3A" font-family="DM Sans, sans-serif">' + graves[q] + '</text>';
+    s += '<text x="' + x(q) + '" y="150" font-size="11" text-anchor="middle" fill="#4A5568" font-family="DM Sans, sans-serif">' + MARES[q].slice(0, 5) + '</text>';
+  }
+  return s + '</svg>';
+}
+
+function renderDetalhe() {
+  var p = acharPonto(selG);
+  if (!p) { $('detalhe').innerHTML = '<p class="vazio">Escolha um ponto na lista ou no mapa para ver o histórico.</p>'; return; }
+  var st = statusAtual(p);
+  var rels = relatosDoPeriodo(p);
+  var h = '<div class="det-topo"><div><p class="praia" style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#4A5568">' + p.praia + '</p>';
+  h += '<h2>' + p.nome + '</h2><span class="selo ' + st + '">' + glifo(st, 18) + NOMES[st] + '</span> <span class="mini">Recuo acumulado: ' + p.recuo[ULT] + ' m (exemplo)</span></div>';
+  h += '<button type="button" class="btn-rel" id="btnRelatorio">Gerar relatório do trecho</button></div>';
+  h += '<div class="g-duas"><div class="g-caixa"><h3>Relatos graves por maré grande</h3>' + graficoGraves(p) + '</div>';
+  h += '<div class="g-caixa"><h3>Fotos datadas (exemplo)</h3>';
+  if (!rels.length) h += '<p class="vazio">Sem relatos no período escolhido.</p>';
+  h += '<div class="galeria">';
+  for (var i = 0; i < rels.length; i++) h += '<figure>' + cenaSVG(p.recuo[rels[i].t]) + '<figcaption>' + rels[i].data + '</figcaption></figure>';
+  h += '</div></div></div>';
+  h += '<div class="g-caixa"><h3>Histórico de relatos · ' + rels.length + (rels.length === 1 ? ' relato' : ' relatos') + '</h3><div class="tabela"><table><thead><tr><th>Data</th><th>Relato da comunidade</th><th>Gravidade</th><th>Confiança</th><th>Onda</th><th>Maré</th><th>Confirmações</th></tr></thead><tbody>';
+  for (var j = rels.length - 1; j >= 0; j--) {
+    var r = rels[j];
+    h += '<tr><td>' + r.data + '</td><td class="rel">' + r.texto + '</td><td><span class="pill ' + GRAV[r.sev] + '">' + GRAV[r.sev] + '</span></td><td><span class="pill ' + r.nivel + '">' + r.nivel + '</span></td><td>' + virgula(r.onda) + ' m</td><td>' + virgula(r.mare) + ' m</td><td>' + r.conf + (r.conf === 1 ? ' vizinho' : ' vizinhos') + '</td></tr>';
+  }
+  h += '</tbody></table></div></div>';
+  $('detalhe').innerHTML = h;
+}
+
+function renderRetorno() {
+  var h = '';
+  for (var i = 0; i < AVISOS.length; i++) h += '<li>' + (AVISOS[i].agendado ? ICONE_AGENDADO : ICONE_ENVIADO) + '<span>' + AVISOS[i].texto + '<small>' + (AVISOS[i].agendado ? '' : 'Enviado · ') + AVISOS[i].quando + '</small></span></li>';
+  $('retorno').innerHTML = h;
+}
+
+function renderGestor() {
+  renderLista();
+  renderDetalhe();
+  atualizaMarcadores();
+}
+
+function escolherG(id, voar) {
+  selG = id;
+  renderGestor();
+  if (voar) { var p = acharPonto(id); voarPara(p.mx, p.my, Math.max(view.k, 1.1), 900); }
+}
+
+// ----- relatório do trecho (prévia na tela) -----
+function abrirRelatorio() {
+  var base = acharPonto(selG);
+  var praia = filtro.praia !== 'todas' ? filtro.praia : base.praia;
+  var pts = PONTOS.filter(function (p) { return p.praia === praia; });
+  var c = 0, a = 0, e = 0, maxP = pts[0];
+  var doMes = [];
+  for (var i = 0; i < pts.length; i++) {
+    var st = statusAtual(pts[i]);
+    if (st === 'crit') c++; else if (st === 'aten') a++; else e++;
+    if (pts[i].recuo[ULT] > maxP.recuo[ULT]) maxP = pts[i];
+    doMes = doMes.concat(pts[i].relatos.filter(function (r) { return r.t === ULT; }));
+  }
+  var confirm = doMes.filter(function (r) { return r.conf >= 2; }).length;
+  var h = '<button class="fechar" id="btnFecharRel" type="button" aria-label="Fechar prévia">' + ICONE_X + '</button>';
+  h += '<span class="selo-previa">Prévia · dados de exemplo</span>';
+  h += '<h2>Relatório do trecho: ' + praia + '</h2>';
+  h += '<p class="mini">Gerado em 18/10/2026 · Piloto zona norte de Ilhéus · SEMA</p>';
+  h += '<div><h3>Resumo</h3><p>O trecho tem ' + pts.length + (pts.length === 1 ? ' ponto monitorado' : ' pontos monitorados') + ': ' + c + ' crítico(s), ' + a + ' em atenção e ' + e + ' estável(is). O maior recuo acumulado desde a maré grande de 15/06 foi de ' + maxP.recuo[ULT] + ' m, em ' + maxP.nome + '. Na última maré grande chegaram ' + doMes.length + (doMes.length === 1 ? ' relato' : ' relatos') + ' da comunidade, ' + (doMes.length ? Math.round(confirm / doMes.length * 100) : 0) + '% confirmados por vizinhos.</p></div>';
+  h += '<div><h3>Pontos críticos</h3>';
+  var crits = pts.filter(function (p) { return statusAtual(p) === 'crit'; });
+  if (!crits.length) h += '<p>Nenhum ponto crítico neste trecho.</p>';
+  else {
+    h += '<ul>';
+    for (var j = 0; j < crits.length; j++) {
+      var ult = crits[j].relatos[crits[j].relatos.length - 1];
+      h += '<li><strong>' + crits[j].nome + '</strong>: recuo de ' + crits[j].recuo[ULT] + ' m. Último relato (' + ult.data + '): “' + ult.texto + '”</li>';
+    }
+    h += '</ul>';
+  }
+  h += '</div><div><h3>Histórico de recuo acumulado (m)</h3><div class="tabela"><table><thead><tr><th>Ponto</th>';
+  for (var t = 0; t < 5; t++) h += '<th>' + MARES[t].slice(0, 5) + '</th>';
+  h += '<th>Status</th></tr></thead><tbody>';
+  for (var k = 0; k < pts.length; k++) {
+    h += '<tr><td>' + pts[k].nome + '</td>';
+    for (var q = 0; q < 5; q++) h += '<td>' + pts[k].recuo[q] + '</td>';
+    h += '<td>' + NOMES[statusAtual(pts[k])] + '</td></tr>';
+  }
+  h += '</tbody></table></div></div>';
+  h += '<p class="fontes"><strong>Fontes:</strong> Relatos da comunidade · Tábua de marés da Marinha · Ondas Copernicus Marine · Panorama da Erosão Costeira (SEMA)</p>';
+  $('papel').innerHTML = h;
+  $('modal').hidden = false;
+  $('btnFecharRel').focus();
+}
+function fecharRelatorio() { $('modal').hidden = true; }
+$('detalhe').addEventListener('click', function (e) { if (e.target.closest('#btnRelatorio')) abrirRelatorio(); });
+$('modal').addEventListener('click', function (e) { if (e.target === $('modal') || e.target.closest('#btnFecharRel')) fecharRelatorio(); });
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  if (!$('modal').hidden) fecharRelatorio();
+  else if (selecionado) fecharFolha();
+});
+
+// ============================ ABAS ============================
+function aoEscolherPonto(id) {
+  if (modo === 'publico') abrirFolha(id); else escolherG(id, true);
+}
+
+function trocarModo(novo) {
+  if (novo === modo) return;
+  if (modo === 'publico') fecharFolha();
+  modo = novo;
+  app.classList.toggle('modo-gestor', novo === 'gestor');
+  $('abaPublico').setAttribute('aria-pressed', novo === 'publico' ? 'true' : 'false');
+  $('abaGestor').setAttribute('aria-pressed', novo === 'gestor' ? 'true' : 'false');
+  anims['vista'] = null; anims['giro'] = null;
+  if (novo === 'gestor') {
+    $('mapaGestor').appendChild(palco);
+    $('gestor').scrollTop = 0;
+    if (selG === null) selG = ordenados(PONTOS)[0].id;
+    medir();
+    view.rumo = 0; view.tilt = 0;
+    view.cx = 180; view.cy = 800; view.k = kVisaoGeral();
+    renderGestor();
+    desenha();
+  } else {
+    $('moldura').insertBefore(palco, $('moldura').firstChild);
+    medir();
+    focoPublico();
+    view.rumo = 0; view.tilt = 0.45;
+    view.cx = FOCO.cx; view.cy = FOCO.cy; view.k = FOCO.k;
+    atualizaMarcadores();
+    desenha();
+  }
+}
+$('abaPublico').addEventListener('click', function () { trocarModo('publico'); });
+$('abaGestor').addEventListener('click', function () { trocarModo('gestor'); });
+
+// ============================ GESTOS: ARRASTAR, GIRAR, INCLINAR, ZOOM ============================
+var ponteiros = {};
+var arrasto = { mov: 0, alvo: null, girar: false };
+
+function escondeDica() { $('dica').classList.add('some'); }
+
+palco.addEventListener('pointerdown', function (e) {
+  palco.setPointerCapture(e.pointerId);
+  ponteiros[e.pointerId] = { x: e.clientX, y: e.clientY };
+  if (Object.keys(ponteiros).length === 1) {
+    arrasto.mov = 0;
+    arrasto.alvo = e.target;
+    arrasto.girar = e.button === 2 || e.shiftKey || e.ctrlKey;
+  }
+  anims['vista'] = null;
+  anims['giro'] = null;
+});
+
+palco.addEventListener('pointermove', function (e) {
+  var p = ponteiros[e.pointerId];
+  if (!p) return;
+  var ids = Object.keys(ponteiros);
+  if (ids.length === 1) {
+    var dx = e.clientX - p.x, dy = e.clientY - p.y;
+    arrasto.mov += Math.abs(dx) + Math.abs(dy);
+    if (arrasto.mov > 8) escondeDica();
+    if (arrasto.girar) {
+      // mouse: botão direito ou Shift + arrastar gira e inclina
+      view.rumo += dx * 0.008;
+      view.tilt = limita(view.tilt - dy * 0.006, 0, 1);
+    } else {
+      // arrastar move o mapa, respeitando o giro e a inclinação
+      var dy2 = dy / cosInc();
+      var cs = Math.cos(view.rumo), sn = Math.sin(view.rumo);
+      view.cx = limita(view.cx - (dx * cs + dy2 * sn) / view.k, -300, 700);
+      view.cy = limita(view.cy - (-dx * sn + dy2 * cs) / view.k, -200, 1600);
+    }
+  } else if (ids.length === 2) {
+    // dois dedos: pinça aproxima, girar os dedos gira o mapa, subir/descer inclina
+    arrasto.mov = 99;
+    escondeDica();
+    var outro = ponteiros[ids[0] === String(e.pointerId) ? ids[1] : ids[0]];
+    var vx0 = p.x - outro.x, vy0 = p.y - outro.y;
+    var vx1 = e.clientX - outro.x, vy1 = e.clientY - outro.y;
+    var d0 = Math.hypot(vx0, vy0), d1 = Math.hypot(vx1, vy1);
+    if (d0 > 0) view.k = limita(view.k * d1 / d0, 0.3, 7);
+    var dAng = Math.atan2(vy1, vx1) - Math.atan2(vy0, vx0);
+    if (dAng > Math.PI) dAng -= 2 * Math.PI;
+    if (dAng < -Math.PI) dAng += 2 * Math.PI;
+    view.rumo += dAng;
+    var dMeio = ((e.clientY + outro.y) / 2) - ((p.y + outro.y) / 2);
+    view.tilt = limita(view.tilt - dMeio * 0.008, 0, 1);
+  }
+  p.x = e.clientX; p.y = e.clientY;
+  pedirDesenho();
+});
+
+function fimToque(e) {
+  if (!ponteiros[e.pointerId]) return;
+  delete ponteiros[e.pointerId];
+  if (e.type === 'pointerup' && arrasto.mov < 8 && !arrasto.girar && Object.keys(ponteiros).length === 0) {
+    var m = arrasto.alvo && arrasto.alvo.closest ? arrasto.alvo.closest('.marcador') : null;
+    if (m) aoEscolherPonto(+m.getAttribute('data-id'));
+    else if (modo === 'publico' && selecionado) fecharFolha();
+  }
+}
+palco.addEventListener('pointerup', fimToque);
+palco.addEventListener('pointercancel', fimToque);
+palco.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+palco.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  anims['vista'] = null;
+  escondeDica();
+  if (e.shiftKey) view.rumo += e.deltaY * 0.002;
+  else view.k = limita(view.k * Math.exp(-e.deltaY * 0.0015), 0.3, 7);
+  pedirDesenho();
+}, { passive: false });
+$('bussola').addEventListener('click', function () { girarPara(0, tiltPadrao(), 700); });
+window.addEventListener('resize', function () { medir(); if (modo === 'publico') focoPublico(); desenha(); });
+
+// ============================ INÍCIO ============================
+montaControles();
+montaAmostras();
+montaMarcadores();
+montaLocais();
+montaCidades();
+montaPorto();
+montaCalor();
+$('legenda').innerHTML =
+  '<span>' + glifo('crit') + 'Crítico</span><span>' + glifo('aten') + 'Atenção</span><span>' + glifo('est') + 'Estável</span>' +
+  '<span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="#E0603A" stroke="#fff" stroke-width="1.5"/></svg>Relato</span>' +
+  '<span><svg width="22" height="8" viewBox="0 0 22 8" aria-hidden="true"><line x1="0" y1="4" x2="22" y2="4" stroke="#0F2A3A" stroke-width="2" stroke-dasharray="5 3"/></svg>Costa em 15/06</span>';
+var maosFinas = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+$('dica').textContent = maosFinas ? 'Arraste para mover · Shift + arrastar gira' : 'Arraste · dois dedos giram e inclinam';
+montaFiltros();
+renderKpis();
+renderRetorno();
+medir();
+atualizaCosta();
+atualizaMarcadores();
+
+// Abertura: sobrevoo inclinado e girado até enquadrar os 8 pontos no cartão
+focoPublico();
+view.k = FOCO.k * 0.6; view.cx = FOCO.cx; view.cy = FOCO.cy; view.tilt = 0.9; view.rumo = -0.6;
+desenha();
+// pinta a superfície logo depois da primeira tela aparecer; o sobrevoo começa em seguida
+setTimeout(function () {
+  pintaSuperficie();
+  setTimeout(function () {
+    voarPara(FOCO.cx, FOCO.cy, FOCO.k, 3000);
+    girarPara(0, 0.45, 3000);
+  }, 120);
+}, 60);
+setTimeout(escondeDica, 9000);
+</script>
+
+</body></html>
